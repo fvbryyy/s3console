@@ -103,3 +103,28 @@ BoxDecoration s3Raised(Color base,
         ],
   );
 }
+
+/// Warna spektrum gaya analyzer klasik (permintaan user 2026-11-13):
+/// hijau di bawah, kuning di tengah-atas, merah di puncak. Gradien dipasang
+/// pada persegi TINGGI PENUH area grafik, jadi warna mengikuti tinggi
+/// absolut batang: batang pendek tetap hijau, yang menjulang berubah
+/// kuning lalu merah.
+Shader rtaGradient(Rect full, {double alpha = 1}) {
+  Color c(Color col) => col.withValues(alpha: alpha);
+  return LinearGradient(
+    begin: Alignment.bottomCenter,
+    end: Alignment.topCenter,
+    colors: [
+      c(const Color(0xFF34C76E)),
+      c(const Color(0xFF34C76E)),
+      c(const Color(0xFFF8CD37)),
+      c(const Color(0xFFF47068)),
+    ],
+    stops: const [0, 0.58, 0.8, 0.97],
+  ).createShader(full);
+}
+
+/// Warna spektrum pada ketinggian frac (0..1) — untuk topi batang.
+Color rtaColorAt(double frac) => frac >= 0.82
+    ? const Color(0xFFF47068)
+    : (frac >= 0.6 ? const Color(0xFFF8CD37) : const Color(0xFF34C76E));

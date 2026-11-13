@@ -244,6 +244,10 @@ class _ChannelScreenState extends State<ChannelScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SectionHead('SPEKTRUM KELUARAN'),
+            const SizedBox(height: 4),
+            RtaBox(rta: ctl.rta),
+            const SizedBox(height: 6),
             ParamSlider(
               label: 'VOLUME',
               valueText: fmtDb(ctl.volDb),
@@ -711,7 +715,7 @@ class _LimiterPanel extends StatelessWidget {
                 ctl.setChField(ch, 'lim', v.toStringAsFixed(2), drag: true),
             onEnd: () => ctl.setChField(ch, 'lim', lim.toStringAsFixed(2)),
           ),
-          const SectionHead('KURVA SOFT-CLIP (tanh)'),
+          const SectionHead('KURVA TRANSFER (masukan → keluaran)'),
           const SizedBox(height: 4),
           SizedBox(
             height: 132,
@@ -722,14 +726,14 @@ class _LimiterPanel extends StatelessWidget {
           ),
           InfoRow(
               label: 'AMBANG',
-              value: '${fmtDb(lim)} — di atas ini sinyal mulai dijepit'),
+              value: '${fmtDb(lim)} — puncak di atas ini diturunkan'),
           InfoRow(
               label: 'REDUKSI',
               value:
-                  'Puncak 0 dBFS tereduksi maks ≈ ${fmtNum(-lim, 1)} dB'),
+                  'Puncak 0 dBFS diturunkan maks ≈ ${fmtNum(-lim, 1)} dB'),
           const SizedBox(height: 8),
           const Text(
-            'Pembatas per kanal (soft-clip tanh): puncak dijepit halus, bukan dipotong kasar, agar power dan speaker aman dari puncak berlebih.',
+            'Peak limiter per kanal (firmware v5.2.2): gain diturunkan sesaat hanya saat puncak melewati ambang (attack/release), bentuk gelombang utuh — bukan saturator. Dulu tanh mentah yang mengukir gelombang sampai berbunyi noise saat ambang diturunkan.',
             style: TextStyle(color: S3Colors.dim, fontSize: 12),
           ),
         ],
@@ -738,14 +742,9 @@ class _LimiterPanel extends StatelessWidget {
   }
 }
 
-/// tanh manual — dart:math TIDAK punya tanh/sinh/cosh (error analyzer
-/// 2026-11-13). tanh(x) = (e^{2x} − 1) / (e^{2x} + 1).
-double _tanh(double x) {
-  final e = math.exp(2 * x);
-  return (e - 1) / (e + 1);
-}
-
-/// Ilustrasi bentuk penjepitan tanh + garis ambang (linear dari dB ambang).
+/// Kurva transfer peak limiter: keluaran mengikuti masukan secara lurus
+/// sampai ambang (garis putus-putus merah), di atasnya rata — gain diturunkan
+/// sesaat oleh firmware (v5.2.2), gelombang tidak diukir ulang.
 class _LimPainter extends CustomPainter {
   final double lim;
   _LimPainter({required this.lim});
@@ -774,12 +773,11 @@ class _LimPainter extends CustomPainter {
       canvas.drawLine(Offset(xOf(t), y), Offset(xOf(t), y + 5), thr);
       canvas.drawLine(Offset(xOf(-t), y), Offset(xOf(-t), y + 5), thr);
     }
-    // kurva tanh: makin rendah ambang, lutut makin tajam
-    final a = 1.2 + (-lim / 24) * 3.4;
+    // transfer: y = x dijepit di ±ambang (linear)
     final path = Path();
     for (var i = 0; i <= 120; i++) {
       final x = -1.25 + 2.5 * i / 120;
-      final y = _tanh(a * x) / _tanh(a);
+      final y = x.clamp(-t, t).toDouble();
       final px = xOf(x), py = yOf(y);
       if (i == 0) {
         path.moveTo(px, py);
@@ -1099,16 +1097,21 @@ class _DlmsGraphPainter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(6, y - 6));
     }
-    // spektrum gaya rancangan: batang biru + topi teal
+    // spektrum hijau-kuning-merah (gradien pada tinggi penuh plot)
     if (rta.length >= 31) {
       final bw = (size.width - 40) / 31;
+      final barPaint = Paint()
+        ..shader = rtaGradient(
+            Rect.fromLTWH(36, 18, size.width - 40, size.height - 44),
+            alpha: 0.55);
       for (var i = 0; i < 31; i++) {
         final frac = ((rta[i] + 60) / 54).clamp(0.0, 1.0).toDouble();
         final h = frac * (size.height - 44);
         final x = 36 + i * bw;
         final y = size.height - 26 - h;
-        canvas.drawRect(Rect.fromLTWH(x, y, bw - 2, h), Paint()..color = S3Colors.rtaBar);
-        canvas.drawRect(Rect.fromLTWH(x, y, bw - 2, 5), Paint()..color = S3Colors.rtaCap);
+        canvas.drawRect(Rect.fromLTWH(x, y, bw - 2, h), barPaint);
+        canvas.drawRect(
+            Rect.fromLTWH(x, y, bw - 2, 5), Paint()..color = rtaColorAt(frac));
       }
     }
     // label frekuensi

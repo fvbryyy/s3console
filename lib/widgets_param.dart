@@ -224,3 +224,52 @@ class SectionHead extends StatelessWidget {
     );
   }
 }
+
+/// Kotak spektrum RTA hidup (31 band) untuk disisipkan ke panel — dipakai
+/// panel MASTER DLMS (permintaan user: klik MASTER ada spektrumnya).
+/// Batang memakai gradien hijau-kuning-merah [rtaGradient].
+class RtaBox extends StatelessWidget {
+  final List<double> rta;
+  final double height;
+  const RtaBox({super.key, required this.rta, this.height = 112});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: S3Colors.graphBg,
+        border: Border.all(color: S3Colors.line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _RtaBarsPainter(rta),
+      ),
+    );
+  }
+}
+
+class _RtaBarsPainter extends CustomPainter {
+  final List<double> rta;
+  _RtaBarsPainter(this.rta);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (rta.length < 31) return;
+    final bw = size.width / 31;
+    final barPaint = Paint()
+      ..shader = rtaGradient(Offset.zero & size, alpha: 0.92);
+    for (var i = 0; i < 31; i++) {
+      final frac = ((rta[i] + 60) / 60).clamp(0.0, 1.0).toDouble();
+      final h = frac * (size.height - 10);
+      canvas.drawRect(
+        Rect.fromLTWH(i * bw + 0.5, size.height - 4 - h, bw - 1, h),
+        barPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RtaBarsPainter old) => true;
+}

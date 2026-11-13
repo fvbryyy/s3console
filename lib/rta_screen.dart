@@ -2,7 +2,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'device_controller.dart';
-import 'theme.dart';
+import 'theme.dart'; // rtaGradient + rtaColorAt
 
 class RtaScreen extends StatelessWidget {
   final DeviceController ctl;
@@ -57,10 +57,13 @@ class _RtaPainter extends CustomPainter {
         final h = frac * (size.height - 30);
         final x = 36 + i * bw;
         final y = size.height - 24 - h;
-        canvas.drawRect(Rect.fromLTWH(x, y, bw - 2, h),
-            Paint()..color = S3Colors.rtaBar);
+        canvas.drawRect(
+            Rect.fromLTWH(x, y, bw - 2, h),
+            Paint()
+              ..shader = rtaGradient(
+                  Rect.fromLTWH(36, 6, size.width - 44, size.height - 30)));
         canvas.drawRect(Rect.fromLTWH(x, y, bw - 2, 6),
-            Paint()..color = S3Colors.rtaCap);
+            Paint()..color = rtaColorAt(frac));
       }
     }
     // label frekuensi (log)

@@ -234,7 +234,8 @@ class _GraphPainter extends CustomPainter {
     // spektrum RTA (31 band) di belakang kurva
     if (rta.length >= 31) {
       final bw = size.width / 31;
-      final barPaint = Paint()..color = S3Colors.cyan.withValues(alpha: 0.33);
+      // Batang spektrum hijau-kuning-merah (gradien tinggi penuh).
+      final barPaint = Paint()..shader = rtaGradient(Offset.zero & size, alpha: 0.5);
       for (var i = 0; i < 31; i++) {
         final frac = ((rta[i] + 60) / 60).clamp(0.0, 1.0).toDouble();
         final h = frac * size.height;
