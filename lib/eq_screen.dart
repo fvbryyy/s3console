@@ -362,6 +362,7 @@ class _EditorRow extends StatelessWidget {
         border: Border(top: BorderSide(color: S3Colors.line)),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // Penanda band yang sedang diedit (pemilihan band cukup dari strip
           // di bawah / titik di grafik — chip B1..B10 dulu dobel, dicabut).
@@ -375,7 +376,6 @@ class _EditorRow extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.bold)),
           ),
-          const Spacer(),
           _Stepper(
             label: 'GAIN',
             value: fmtDb(b.g),
@@ -511,7 +511,7 @@ class _Bank extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = ctl.state!;
     return Container(
-      height: 218,
+      height: 232,
       decoration: const BoxDecoration(
         color: S3Colors.panel,
         border: Border(top: BorderSide(color: S3Colors.line)),
@@ -519,19 +519,25 @@ class _Bank extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: s.bands.length,
-              itemBuilder: (context, i) {
-                final b = s.bands[i];
-                final selected = i == ctl.selectedBand;
+            child: LayoutBuilder(
+              builder: (context, c) {
+                // Lebar strip dihitung dari ruang tersedia: 10 strip selalu
+                // mengisi penuh sampai ke MAIN (dulu lebar tetap 74 px dan
+                // menyisakan ruang kosong besar di jendela lebar).
+                final stripW = c.maxWidth / s.bands.length;
+                return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: s.bands.length,
+                  itemBuilder: (context, i) {
+                    final b = s.bands[i];
+                    final selected = i == ctl.selectedBand;
                 return GestureDetector(
                   onTap: () {
                     ctl.selectedBand = i;
                     ctl.touch();
                   },
                   child: Container(
-                    width: 74,
+                    width: stripW - 8,
                     margin: const EdgeInsets.all(4),
                     padding: const EdgeInsets.fromLTRB(5, 5, 5, 5),
                     decoration: s3Raised(
@@ -586,6 +592,8 @@ class _Bank extends StatelessWidget {
                   ),
                 );
               },
+            );
+              },
             ),
           ),
           // strip master — selalu menempel di kanan
@@ -593,10 +601,11 @@ class _Bank extends StatelessWidget {
             width: 108,
             margin: const EdgeInsets.all(4),
             padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
-            decoration: BoxDecoration(
-              color: S3Colors.strip,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: S3Colors.muteRed, width: 1.5),
+            decoration: s3Raised(
+              S3Colors.strip,
+              radius: 6,
+              borderColor: S3Colors.muteRed,
+              borderWidth: 1.5,
             ),
             child: Column(
               children: [
