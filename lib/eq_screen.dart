@@ -362,7 +362,6 @@ class _EditorRow extends StatelessWidget {
         border: Border(top: BorderSide(color: S3Colors.line)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // Penanda band yang sedang diedit (pemilihan band cukup dari strip
           // di bawah / titik di grafik — chip B1..B10 dulu dobel, dicabut).
@@ -376,13 +375,16 @@ class _EditorRow extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.bold)),
           ),
-          _Stepper(
+          Expanded(
+            child: _Stepper(
             label: 'GAIN',
             value: fmtDb(b.g),
             onMinus: () => ctl.setBandField(sel, 'g', (b.g - 0.5).toString()),
             onPlus: () => ctl.setBandField(sel, 'g', (b.g + 0.5).toString()),
           ),
-          _Stepper(
+          ),
+          Expanded(
+            child: _Stepper(
             label: 'FREKUENSI',
             value: b.f >= 1000
                 ? '${fmtNum(b.f / 1000, 2)} kHz'
@@ -392,11 +394,14 @@ class _EditorRow extends StatelessWidget {
             onPlus: () =>
                 ctl.setBandField(sel, 'f', (b.f * 1.0595).toString()),
           ),
-          _Stepper(
+          ),
+          Expanded(
+            child: _Stepper(
             label: 'Q',
             value: fmtNum(b.q, 2),
             onMinus: () => ctl.setBandField(sel, 'q', (b.q / 1.25).toString()),
             onPlus: () => ctl.setBandField(sel, 'q', (b.q * 1.25).toString()),
+          ),
           ),
           const SizedBox(width: 8),
           _MiniToggle(
@@ -424,25 +429,35 @@ class _Stepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(color: S3Colors.dim, fontSize: 9)),
+              style: const TextStyle(color: S3Colors.dim, fontSize: 10)),
+          const SizedBox(height: 3),
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               _StepBtn(icon: Icons.remove, onTap: onMinus),
-              Container(
-                constraints: const BoxConstraints(minWidth: 62),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                alignment: Alignment.center,
-                child: Text(value,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 6),
+              // Kotak nilai meregang mengisi jatah lebar stepper (bidang
+              // cekung gelap: ini tampilan nilai, bukan tombol).
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101216),
+                    border: Border.all(color: S3Colors.line),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(value,
+                      style: const TextStyle(
+                          fontSize: 13.5, fontWeight: FontWeight.bold)),
+                ),
               ),
+              const SizedBox(width: 6),
               _StepBtn(icon: Icons.add, onTap: onPlus),
             ],
           ),
