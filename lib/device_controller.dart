@@ -64,6 +64,19 @@ class DeviceController extends ChangeNotifier {
   /// memanggil notifyListeners yang terproteksi.
   void touch() => notifyListeners();
 
+  /// Ganti jaringan WiFi alat. Alat mulai ulang ke jaringan baru, jadi
+  /// koneksi ini pasti putus — akhiri setempat dengan disconnect().
+  Future<bool> setWifi(String ssid, String pass) async {
+    if (_api == null) return false;
+    try {
+      await _api!.postWifi(ssid.trim(), pass);
+      disconnect();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void disconnect() {
     _stopPolling();
     connected = false;

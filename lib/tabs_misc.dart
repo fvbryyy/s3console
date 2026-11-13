@@ -236,6 +236,8 @@ class PengaturanScreen extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
+          _WifiSection(ctl: ctl),
+          const SizedBox(height: 8),
           _row(
             'Putuskan koneksi',
             'Kembali ke layar sambung. Alat tetap menyala dan bisa disambung lagi.',
@@ -364,6 +366,130 @@ class InfoScreen extends StatelessWidget {
                     fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+/// Ganti jaringan WiFi alat dari aplikasi — fungsi yang dulu hanya ada di
+/// panel web; wajib ada sebelum panel diturunkan jadi halaman darurat
+/// (keputusan user 2026-11-13: setelan full APK + halaman darurat kecil).
+class _WifiSection extends StatefulWidget {
+  final DeviceController ctl;
+  const _WifiSection({required this.ctl});
+
+  @override
+  State<_WifiSection> createState() => _WifiSectionState();
+}
+
+class _WifiSectionState extends State<_WifiSection> {
+  final _ssid = TextEditingController();
+  final _pass = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _ssid.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _dec(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: S3Colors.dim, fontSize: 13),
+        filled: true,
+        fillColor: const Color(0xFF101216),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: S3Colors.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: S3Colors.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: S3Colors.cyan),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      );
+
+  Future<void> _save() async {
+    final ssid = _ssid.text.trim();
+    if (ssid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Isi dulu nama WiFi (SSID)-nya.')),
+      );
+      return;
+    }
+    final ok = await _confirm(context, 'Ganti jaringan WiFi alat?',
+        'Alat akan mulai ulang dan pindah ke "$ssid". HP ini harus tersambung ke jaringan yang sama agar bisa menyambung lagi dari aplikasi.');
+    if (!ok) return;
+    setState(() => _busy = true);
+    final done = await widget.ctl.setWifi(ssid, _pass.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(done
+            ? 'Tersimpan — alat mulai ulang ke "$ssid". Sambungkan HP ke jaringan itu, lalu sambung ulang.'
+            : 'Gagal mengirim ke alat. Coba lagi.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: s3Raised(S3Colors.panel, radius: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Jaringan WiFi alat',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 3),
+          const Text(
+            'Pindahkan alat ke jaringan WiFi lain (mis. ganti router / kata sandi). Alat mulai ulang setelah disimpan.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _ssid,
+            style: const TextStyle(fontSize: 13.5),
+            decoration: _dec('Nama WiFi (SSID)'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _pass,
+            obscureText: true,
+            style: const TextStyle(fontSize: 13.5),
+            decoration: _dec('Kata sandi WiFi (kosongkan bila terbuka)'),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Material(
+              color: S3Colors.card,
+              elevation: 2,
+              shadowColor: Colors.black,
+              borderRadius: BorderRadius.circular(6),
+              child: InkWell(
+                onTap: _busy ? null : _save,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                  child: Text(_busy ? 'Mengirim…' : 'Simpan & mulai ulang',
+                      style: const TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

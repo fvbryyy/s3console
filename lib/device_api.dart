@@ -44,6 +44,14 @@ class DeviceApi {
     if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
   }
 
+  /// Ganti kredensial WiFi alat; alat mulai ulang ke jaringan baru.
+  Future<void> postWifi(String ssid, String pass) async {
+    final r = await http
+        .post(_u('/api/wifi'), body: {'ssid': ssid, 'pass': pass})
+        .timeout(const Duration(seconds: 4));
+    if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
+  }
+
   /// Simpan keadaan sekarang ke slot user (0-based).
   Future<void> saveSlot(int slot) async {
     final r = await http
