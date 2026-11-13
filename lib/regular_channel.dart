@@ -233,56 +233,37 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
   }
 
   Widget _trimPanel(DspState s, bool left) {
-    final v = left ? s.trimL : s.trimR;
     final pol = left ? s.polL : s.polR;
+    // Trim diatur dari fader strip OUT (kenop TRIM dobel dicabut);
+    // panel ini khusus fase output.
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('TRIM & FASE OUTPUT',
+        const Text('FASE OUTPUT',
             style: TextStyle(
                 color: S3Colors.dim,
                 fontSize: 12,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            S3Knob(
-              label: 'TRIM',
-              valueText: fmtDb(v),
-              frac: ((v + 12) / 24).clamp(0, 1).toDouble(),
-              arcColor: S3Colors.yellow,
-              diameter: 110,
-              onFrac: (f) => ctl.setParam(
-                  left ? 'trimL' : 'trimR', f * 24 - 12,
-                  drag: true),
-              onEnd: () => ctl.setParam(left ? 'trimL' : 'trimR', v),
-            ),
-            const SizedBox(width: 30),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _onToggle('FASE', pol,
-                    () => ctl.setParam(left ? 'polL' : 'polR', pol ? 0 : 1)),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: 330,
-                  child: Text(
-                    'Trim menyesuaikan level output ini saja (±12 dB). Fase membalik polaritas 180° — berguna bila salah satu speaker terpasang terbalik.',
-                    style:
-                        const TextStyle(color: S3Colors.dim, fontSize: 12.5),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        _onToggle('FASE', pol,
+            () => ctl.setParam(left ? 'polL' : 'polR', pol ? 0 : 1)),
+        const SizedBox(height: 12),
+        const SizedBox(
+          width: 380,
+          child: Text(
+            'Trim output (±12 dB) diatur dari fader strip-nya di kiri. Fase membalik polaritas 180° — berguna bila salah satu speaker terpasang terbalik.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
+          ),
         ),
       ],
     );
   }
 
   Widget _masterPanel(DspState s) {
+    // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut).
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('MASTER REGULER',
@@ -292,29 +273,16 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            S3Knob(
-              label: 'VOLUME',
-              valueText: fmtDb(ctl.volDb),
-              frac: ((ctl.volDb + 60) / 60).clamp(0, 1).toDouble(),
-              arcColor: S3Colors.red,
-              diameter: 110,
-              onFrac: (f) => ctl.setVolDb(f * 60 - 60, drag: true),
-              onEnd: () => ctl.setVolDb(ctl.volDb),
-            ),
-            const SizedBox(width: 26),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _onToggle(
-                    'MUTE', s.mute, () => ctl.setMute(!s.mute)),
-                const SizedBox(height: 8),
-                _onToggle(
-                    'DIM', s.dim, () => ctl.setDim(!s.dim)),
-              ],
-            ),
+            _onToggle('MUTE', s.mute, () => ctl.setMute(!s.mute)),
+            const SizedBox(width: 10),
+            _onToggle('DIM', s.dim, () => ctl.setDim(!s.dim)),
           ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Volume diatur dari fader strip MASTER di kiri.',
+          style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
         ),
       ],
     );

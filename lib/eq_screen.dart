@@ -327,43 +327,19 @@ class _EditorRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // chip band
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (var i = 0; i < s.bands.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 5),
-                      child: ChoiceChip(
-                        label: Text('B${i + 1}'),
-                        selected: i == sel,
-                        showCheckmark: false,
-                        labelStyle: TextStyle(
-                          color: i == sel ? Colors.white : S3Colors.dim,
-                          fontSize: 12,
-                        ),
-                        selectedColor: bandColors[i % bandColors.length]
-                            .withValues(alpha: 0.45),
-                        backgroundColor: S3Colors.card,
-                        side: BorderSide(
-                          color: i == sel
-                              ? bandColors[i % bandColors.length]
-                              : S3Colors.line,
-                          width: i == sel ? 2 : 1,
-                        ),
-                        onSelected: (_) {
-                          ctl.selectedBand = i;
-                          ctl.touch();
-                        },
-                      ),
-                    ),
-                ],
-              ),
+          // Penanda band yang sedang diedit (pemilihan band cukup dari strip
+          // di bawah / titik di grafik — chip B1..B10 dulu dobel, dicabut).
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: bandColors[sel % bandColors.length].withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(6),
             ),
+            child: Text('B${sel + 1}',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(width: 10),
+          const Spacer(),
           _Stepper(
             label: 'GAIN',
             value: fmtDb(b.g),
@@ -392,12 +368,7 @@ class _EditorRow extends StatelessWidget {
             onTap: () =>
                 ctl.setBandField(sel, 't', ((b.t + 1) % 3).toString()),
           ),
-          const SizedBox(width: 6),
-          _MiniToggle(
-            label: b.on ? 'BAND ON' : 'BAND OFF',
-            active: b.on,
-            onTap: () => ctl.setBandField(sel, 'on', b.on ? '0' : '1'),
-          ),
+          // ON/OFF band cukup dari tombol ON di strip band (dulu dobel di sini).
         ],
       ),
     );

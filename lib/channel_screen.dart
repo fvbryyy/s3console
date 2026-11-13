@@ -196,13 +196,15 @@ class _ChannelScreenState extends State<ChannelScreen> {
   Widget _detailBody(DeviceController ctl, DspState s, DlmsState d) {
     if (sel == 0 || sel == 1) {
       final isA = sel == 0;
-      final gain = isA ? d.inGainA : d.inGainB;
       final dly = isA ? d.inDlyA : d.inDlyB;
       final on = isA ? d.inOnA : d.inOnB;
+      // Gain input diatur dari fader strip (kenop GAIN dobel dicabut);
+      // panel ini khusus delay input + status aktif.
       return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('PARAMETER',
+          const Text('DELAY INPUT',
               style: TextStyle(
                   color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
@@ -210,56 +212,58 @@ class _ChannelScreenState extends State<ChannelScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               S3Knob(
-                label: 'GAIN',
-                valueText: fmtDb(gain),
-                frac: dbToFrac(gain),
-                arcColor: const Color(0xFFFAAC58),
-                onFrac: (f) => ctl.setInGain(isA, fracToDb(f), drag: true),
-                onEnd: () => ctl.setInGain(isA, gain),
-              ),
-              const SizedBox(width: 34),
-              S3Knob(
                 label: 'DELAY',
                 valueText: '${fmtNum(dly, 1)} ms',
                 frac: (dly / 100).clamp(0, 1).toDouble(),
                 arcColor: const Color(0xFF6ED0E4),
+                diameter: 120,
                 onFrac: (f) => ctl.setInDelay(isA, f * 100, drag: true),
                 onEnd: () => ctl.setInDelay(isA, dly),
               ),
               const SizedBox(width: 34),
-              _chipBtn(on ? 'AKTIF' : 'NONAKTIF', on,
-                  () => ctl.setInOn(isA, !on)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _chipBtn(on ? 'AKTIF' : 'NONAKTIF', on,
+                      () => ctl.setInOn(isA, !on)),
+                  const SizedBox(height: 12),
+                  const SizedBox(
+                    width: 320,
+                    child: Text(
+                      'Gain input ini diatur dari fader strip-nya di kiri. Delay input (0–100 ms) menyelaraskan sumber sebelum masuk rantai DLMS.',
+                      style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ],
       );
     }
     if (sel == 4) {
+      // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut).
       return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('PARAMETER',
+          const Text('MASTER',
               style: TextStyle(
                   color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              S3Knob(
-                label: 'VOLUME',
-                valueText: fmtDb(ctl.volDb),
-                frac: (ctl.volDb + 60) / 60,
-                arcColor: S3Colors.red,
-                onFrac: (f) => ctl.setVolDb(f * 60 - 60, drag: true),
-                onEnd: () => ctl.setVolDb(ctl.volDb),
-              ),
-              const SizedBox(width: 34),
               _chipBtn(s.mute ? 'MUTE AKTIF' : 'MUTE', s.mute,
                   () => ctl.setMute(!s.mute)),
               const SizedBox(width: 10),
               _chipBtn(s.dim ? 'DIM AKTIF' : 'DIM', s.dim,
                   () => ctl.setDim(!s.dim)),
             ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Volume diatur dari fader strip MASTER di kiri — strip itu berlaku di semua mode.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
           ),
         ],
       );
@@ -310,6 +314,7 @@ class _RoutingPanel extends StatelessWidget {
       ('A+B', 'Jumlah A + B'),
     ];
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('SUMBER KANAL',
@@ -329,7 +334,7 @@ class _RoutingPanel extends StatelessWidget {
                       onTap: () => ctl.setChField(ch, 'src', '$i'),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        padding: const EdgeInsets.symmetric(vertical: 26),
                         child: Column(
                           children: [
                             Text(opts[i].$1,
@@ -498,10 +503,12 @@ class _XoverPainter extends CustomPainter {
     );
     double yOf(double mag) =>
         14 + (1 - mag.clamp(0.0, 1.0)) * (size.height - 44);
-    // garis -3 dB penanda
-    final y3 = yOf(0.707);
-    canvas.drawLine(Offset(8, y3), Offset(size.width - 8, y3),
-        Paint()..color = const Color(0xFF2C3542)..strokeWidth = 1);
+    // garis penanda -3 / -6 / -12 dB
+    for (final mag in [0.707, 0.5, 0.25]) {
+      final y = yOf(mag);
+      canvas.drawLine(Offset(8, y), Offset(size.width - 8, y),
+          Paint()..color = const Color(0xFF232B36)..strokeWidth = 1);
+    }
     Path pathFor(bool hpToo) {
       final p = Path();
       const steps = 130;
@@ -518,39 +525,59 @@ class _XoverPainter extends CustomPainter {
       return p;
     }
 
-    if (c.hpfOn) {
+    // Kurva HPF & LPF SELALU digambar (terang bila ON, redup bila OFF)
+    // agar titik potong crossover tetap terlihat — dulu kurva hilang total
+    // saat filter mati dan grafik tampak kosong.
+    Path curveFor(bool hp) {
       final p = Path();
       const steps = 130;
       for (var i = 0; i <= steps; i++) {
         final x = size.width * i / steps;
         final f = _xToF(x, size.width);
-        final y = yOf(_xoMag(true, c.hpfF, c.tf, f));
+        final y = yOf(_xoMag(hp, hp ? c.hpfF : c.lpfF, c.tf, f));
         i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
       }
-      canvas.drawPath(
-          p,
-          Paint()
-            ..color = const Color(0xFFFAAC58)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.6);
+      return p;
     }
-    if (c.lpfOn) {
-      final p = Path();
-      const steps = 130;
-      for (var i = 0; i <= steps; i++) {
-        final x = size.width * i / steps;
-        final f = _xToF(x, size.width);
-        final y = yOf(_xoMag(false, c.lpfF, c.tf, f));
-        i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
-      }
-      canvas.drawPath(
-          p,
+
+    canvas.drawPath(
+        curveFor(true),
+        Paint()
+          ..color = const Color(0xFFFAAC58)
+              .withValues(alpha: c.hpfOn ? 1 : 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8);
+    canvas.drawPath(
+        curveFor(false),
+        Paint()
+          ..color = const Color(0xFF6ED0E4)
+              .withValues(alpha: c.lpfOn ? 1 : 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8);
+    // penanda vertikal frekuensi potong + labelnya
+    for (final (fc, isHp) in [(c.hpfF, true), (c.lpfF, false)]) {
+      final x = _fToX(fc, size.width);
+      canvas.drawLine(
+          Offset(x, 6),
+          Offset(x, size.height - 18),
           Paint()
-            ..color = const Color(0xFF6ED0E4)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.6);
+            ..color = (isHp ? const Color(0xFFFAAC58) : const Color(0xFF6ED0E4))
+                .withValues(alpha: 0.4)
+            ..strokeWidth = 1);
+      final tp = TextPainter(
+        text: TextSpan(
+            text: isHp ? 'HPF' : 'LPF',
+            style: TextStyle(
+                color: isHp
+                    ? const Color(0xFFFAAC58)
+                    : const Color(0xFF6ED0E4),
+                fontSize: 9,
+                fontWeight: FontWeight.bold)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x + 3, 6));
     }
-    // gabungan (putih)
+    // gabungan filter yang AKTIF saja (putih)
     canvas.drawPath(
       pathFor(true),
       Paint()
@@ -584,6 +611,7 @@ class _DelayPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('DELAY KANAL',
@@ -598,7 +626,7 @@ class _DelayPanel extends StatelessWidget {
               valueText: '${fmtNum(ms, 2)} ms',
               frac: (ms / 20).clamp(0, 1).toDouble(),
               arcColor: const Color(0xFF6ED0E4),
-              diameter: 110,
+              diameter: 132,
               onFrac: (f) => ctl.setChField(
                   ch, 'dly', (f * 20).toStringAsFixed(2),
                   drag: true),
@@ -630,6 +658,7 @@ class _LimiterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('LIMITER KANAL',
@@ -644,7 +673,7 @@ class _LimiterPanel extends StatelessWidget {
               valueText: fmtDb(lim),
               frac: ((lim + 24) / 24).clamp(0, 1).toDouble(),
               arcColor: S3Colors.red,
-              diameter: 110,
+              diameter: 132,
               onFrac: (f) => ctl.setChField(
                   ch, 'lim', (f * 24 - 24).toStringAsFixed(2),
                   drag: true),
@@ -676,6 +705,7 @@ class _FasePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('FASE & STATUS KANAL',

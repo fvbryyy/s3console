@@ -69,9 +69,16 @@ class DeviceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _meterBusy = false, _rtaBusy = false;
+
   void _startPolling() {
     _stopPolling();
+    // Penjaga in-flight: jangan menumpuk permintaan baru selama yang lama
+    // belum pulang — penumpukan di server ESP + antrean koneksi peramban
+    // membuat meter terlihat "mati lalu hidup" (beku lama, lalu meloncat).
     _meterTimer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
+      if (_meterBusy) return;
+      _meterBusy = true;
       try {
         meter = await _api!.fetchMeter();
         if (state != null && state!.dirty != meter.dirty) {
@@ -79,12 +86,16 @@ class DeviceController extends ChangeNotifier {
         }
         notifyListeners();
       } catch (_) {/* abaikan sesaat; putus total ditangani reconnect manual */}
+      _meterBusy = false;
     });
     _rtaTimer = Timer.periodic(const Duration(milliseconds: 150), (_) async {
+      if (_rtaBusy) return;
+      _rtaBusy = true;
       try {
         rta = await _api!.fetchRta();
         notifyListeners();
       } catch (_) {}
+      _rtaBusy = false;
     });
   }
 
