@@ -1,5 +1,5 @@
 name: s3console
-description: "A new Flutter project."
+description: "S3 Air — konsol DSP untuk ESP32-S3 + PCM5102 (pendamping firmware S3air)."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -30,6 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

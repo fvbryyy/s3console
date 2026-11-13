@@ -1,121 +1,409 @@
+// S3 Air — konsol DSP (aplikasi pendamping ESP32-S3 + PCM5102).
+// Alur: layar sambung -> konsol. Konsol berbicara ke API firmware yang sama
+// dengan panel web (mbahdac.local). Tata letak lanskap mengikuti rancangan.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'device_controller.dart';
+import 'eq_screen.dart';
+import 'theme.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+  runApp(const S3App());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class S3App extends StatefulWidget {
+  const S3App({super.key});
+  @override
+  State<S3App> createState() => _S3AppState();
+}
 
-  // This widget is the root of your application.
+class _S3AppState extends State<S3App> {
+  final ctl = DeviceController();
+
+  @override
+  void dispose() {
+    ctl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+      title: 'S3 Air',
+      debugShowCheckedModeBanner: false,
+      theme: buildS3Theme(),
+      home: AnimatedBuilder(
+        animation: ctl,
+        builder: (context, _) =>
+            ctl.connected ? ConsoleScreen(ctl: ctl) : ConnectScreen(ctl: ctl),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+// -----------------------------------------------------------------------------
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class ConnectScreen extends StatefulWidget {
+  final DeviceController ctl;
+  const ConnectScreen({super.key, required this.ctl});
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ConnectScreen> createState() => _ConnectScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _ConnectScreenState extends State<ConnectScreen> {
+  late final TextEditingController hostCtl =
+      TextEditingController(text: widget.ctl.host);
+  bool triedAuto = false;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  @override
+  void initState() {
+    super.initState();
+    // Sekali sambung, aplikasi mengingat alat & mencoba menyambung sendiri.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!triedAuto) {
+        triedAuto = true;
+        await widget.ctl.connect(hostCtl.text);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final ctl = widget.ctl;
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+      body: SafeArea(
+        child: Row(
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            // identitas besar di kiri (tanpa teks pemasaran)
+            Expanded(
+              flex: 5,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(
+                            fontSize: 64,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2),
+                        children: [
+                          TextSpan(text: 'S3 ', style: TextStyle(color: S3Colors.txt)),
+                          TextSpan(text: 'AIR', style: TextStyle(color: S3Colors.cyan)),
+                        ],
+                      ),
+                    ),
+                    const Text('KONSOL DSP',
+                        style: TextStyle(
+                            color: S3Colors.dim,
+                            fontSize: 15,
+                            letterSpacing: 6)),
+                  ],
+                ),
+              ),
+            ),
+            // kartu sambung di kanan
+            Expanded(
+              flex: 4,
+              child: Center(
+                child: Container(
+                  width: 360,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: S3Colors.panel,
+                    border: Border.all(color: S3Colors.line),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('Alat ditemukan',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: S3Colors.card,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('S3 Air · mbahdac',
+                                style: TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 2),
+                            Text(
+                              ctl.state?.fw.isNotEmpty == true
+                                  ? 'Firmware ${ctl.state!.fw}'
+                                  : 'Konsol DSP ESP32-S3',
+                              style: const TextStyle(color: S3Colors.dim),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: hostCtl,
+                        decoration: const InputDecoration(
+                          labelText: 'Alamat alat (nama .local atau IP)',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                      if (ctl.lastError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(ctl.lastError!,
+                            style: const TextStyle(color: S3Colors.red)),
+                      ],
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: S3Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: ctl.connecting
+                            ? null
+                            : () => ctl.connect(hostCtl.text),
+                        child: Text(
+                          ctl.connecting ? 'MENYAMBUNG…' : 'HUBUNGKAN',
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                hostCtl.text = '192.168.1.26';
+                              },
+                              child: const Text('IP MANUAL'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: OutlinedButton(
+                              onPressed: null, // BLE menyusul sesudah firmware BLE
+                              child: Text('BLUETOOTH'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Catatan: HP dan alat harus satu WiFi yang sama.',
+                        style: TextStyle(color: S3Colors.dim, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class ConsoleScreen extends StatefulWidget {
+  final DeviceController ctl;
+  const ConsoleScreen({super.key, required this.ctl});
+  @override
+  State<ConsoleScreen> createState() => _ConsoleScreenState();
+}
+
+class _ConsoleScreenState extends State<ConsoleScreen> {
+  static const tabs = ['EQ', 'Gate', 'Comp', 'Main', 'Preset', 'Sistem', 'DLMS'];
+  int tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final ctl = widget.ctl;
+    final s = ctl.state!;
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _navbar(ctl, s),
+            Expanded(child: _body(ctl, s)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navbar(DeviceController ctl, dynamic s) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: const BoxDecoration(
+        color: S3Colors.panel,
+        border: Border(bottom: BorderSide(color: S3Colors.line)),
+      ),
+      child: Row(
+        children: [
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              children: [
+                TextSpan(text: 'S3 ', style: TextStyle(color: S3Colors.txt)),
+                TextSpan(text: 'AIR', style: TextStyle(color: S3Colors.cyan)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          for (var i = 0; i < tabs.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: Material(
+                color: i == tab ? S3Colors.blue : S3Colors.card,
+                borderRadius: BorderRadius.circular(5),
+                child: InkWell(
+                  onTap: () => setState(() => tab = i),
+                  borderRadius: BorderRadius.circular(5),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                    child: Text(
+                      tabs[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: i == tab ? Colors.white : S3Colors.dim,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          const Spacer(),
+          // lampu CLIP
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: ctl.meter.clip ? S3Colors.muteRed : S3Colors.card,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text('CLIP',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: ctl.meter.clip ? Colors.white : S3Colors.dim)),
+          ),
+          const SizedBox(width: 8),
+          // tombol SIMPAN + titik belum tersimpan
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: S3Colors.blue),
+                onPressed: () => ctl.saveAll(),
+                child: const Text('SIMPAN'),
+              ),
+              if (s.dirty)
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: S3Colors.amber,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          // saklar mode DLMS | REGULER
+          Container(
+            decoration: BoxDecoration(
+              color: S3Colors.card,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _seg('REGULER', !s.dlms.on, () => ctl.setDlmsOn(false)),
+                _seg('DLMS', s.dlms.on, () => ctl.setDlmsOn(true)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.circle, size: 9, color: S3Colors.green),
+              SizedBox(width: 5),
+              Text('Terhubung', style: TextStyle(color: S3Colors.dim)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(String label, bool active, VoidCallback onTap) {
+    return Material(
+      color: active ? S3Colors.blue : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: active ? Colors.white : S3Colors.dim)),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(DeviceController ctl, dynamic s) {
+    switch (tabs[tab]) {
+      case 'EQ':
+        return EqScreen(ctl: ctl, onOpenDlms: () => setState(() => tab = 6));
+      case 'DLMS':
+        return _placeholder(
+            'Tab DLMS — layar input A/B, routing, crossover, delay, limiter per OUT menyusul di increment berikutnya. Untuk sementara atur DLMS dari panel web (mbahdac.local).');
+      default:
+        return _placeholder(
+            'Tab ${tabs[tab]} menyusul di increment berikutnya — fondasi aplikasi + tab EQ lebih dulu, sesuai urutan uji.');
+    }
+  }
+
+  Widget _placeholder(String msg) {
+    return Center(
+      child: Container(
+        width: 460,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: S3Colors.panel,
+          border: Border.all(color: S3Colors.line),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(msg,
+            style: const TextStyle(color: S3Colors.dim, fontSize: 13),
+            textAlign: TextAlign.center),
       ),
     );
   }
