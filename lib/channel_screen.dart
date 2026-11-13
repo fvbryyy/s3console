@@ -148,14 +148,18 @@ class _ChannelScreenState extends State<ChannelScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 decoration: BoxDecoration(
-                  color: S3Colors.plate,
+                  color: sel == 4
+                      ? S3Colors.capRed
+                      : (sel < 2 ? S3Colors.blue : S3Colors.plate),
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Text(_names[sel],
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: S3Colors.accDark)),
+                        color: sel == 2 || sel == 3
+                            ? S3Colors.accDark
+                            : Colors.white)),
               ),
               const SizedBox(width: 10),
               if (sel == 2 || sel == 3)

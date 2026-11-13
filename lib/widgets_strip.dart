@@ -54,11 +54,31 @@ class DesignStrip extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
         child: Column(
           children: [
-            Text(name,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            // Nama kanal di atas pelat berwarna agar beda & terbaca sekilas:
+            // IN = biru, OUT = hijau (sama dengan pil panel detail), MASTER = merah.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                color: master
+                    ? S3Colors.capRed
+                    : (name.startsWith('IN')
+                        ? S3Colors.blue
+                        : S3Colors.plate),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.6,
+                      color: (!master && !name.startsWith('IN'))
+                          ? S3Colors.accDark
+                          : Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
             const SizedBox(height: 4),
             Text(gainText,
                 style: const TextStyle(
