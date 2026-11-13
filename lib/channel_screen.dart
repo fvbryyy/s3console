@@ -7,6 +7,7 @@ import 'device_controller.dart';
 import 'models.dart';
 import 'regular_channel.dart';
 import 'theme.dart';
+import 'widgets_param.dart';
 import 'widgets_strip.dart';
 
 class ChannelScreen extends StatefulWidget {
@@ -196,101 +197,87 @@ class _ChannelScreenState extends State<ChannelScreen> {
       final isA = sel == 0;
       final dly = isA ? d.inDlyA : d.inDlyB;
       final on = isA ? d.inOnA : d.inOnB;
-      // Gain input diatur dari fader strip (kenop GAIN dobel dicabut);
-      // panel ini khusus delay input + status aktif.
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('DELAY INPUT',
-              style: TextStyle(
-                  color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              S3Knob(
-                label: 'DELAY',
-                valueText: '${fmtNum(dly, 1)} ms',
-                frac: (dly / 100).clamp(0, 1).toDouble(),
-                arcColor: const Color(0xFF6ED0E4),
-                diameter: 150,
-                onFrac: (f) => ctl.setInDelay(isA, f * 100, drag: true),
-                onEnd: () => ctl.setInDelay(isA, dly),
-              ),
-              const SizedBox(width: 34),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _chipBtn(on ? 'AKTIF' : 'NONAKTIF', on,
-                      () => ctl.setInOn(isA, !on)),
-                  const SizedBox(height: 12),
-                  const SizedBox(
-                    width: 320,
-                    child: Text(
-                      'Gain input ini diatur dari fader strip-nya di kiri. Delay input (0–100 ms) menyelaraskan sumber sebelum masuk rantai DLMS.',
-                      style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
+      final gain = isA ? d.inGainA : d.inGainB;
+      // Panel PADAT (rombakan total): status tersegmentasi + slider delay
+      // presisi + ringkasan nyata. Gain tetap dari fader strip — di sini
+      // info baca-saja, bukan kontrol dobel.
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ParamSegmented(
+              label: 'STATUS',
+              options: const ['NONAKTIF', 'AKTIF'],
+              selected: on ? 1 : 0,
+              onSelect: (i) => ctl.setInOn(isA, i == 1),
+            ),
+            ParamSlider(
+              label: 'DELAY',
+              valueText: '${fmtNum(dly, 1)} ms',
+              value: dly,
+              min: 0,
+              max: 100,
+              color: const Color(0xFF6ED0E4),
+              onChanged: (v) => ctl.setInDelay(isA, v, drag: true),
+              onEnd: () => ctl.setInDelay(isA, dly),
+            ),
+            const SectionHead('RINGKASAN INPUT'),
+            InfoRow(label: 'GAIN', value: '${fmtDb(gain)} — dari fader strip'),
+            InfoRow(label: 'JARAK', value: '≈ ${fmtNum(dly * 34.3, 0)} cm'),
+            InfoRow(
+                label: 'SAMPEL',
+                value: '${(dly * 48).round()} sampel @ 48 kHz'),
+            const SizedBox(height: 8),
+            const Text(
+              'Delay input menyelaraskan sumber sebelum masuk rantai DLMS (mis. input B dari perangkat yang lebih lambat).',
+              style: TextStyle(color: S3Colors.dim, fontSize: 12),
+            ),
+          ],
+        ),
       );
     }
     if (sel == 4) {
-      // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut);
-      // MUTE & DIM jadi blok besar mengisi panel.
-      Widget bigBlock(String label, bool active, Color activeColor,
-          VoidCallback onTap) {
-        return Expanded(
-          child: Material(
-            color: active ? activeColor : S3Colors.card,
-            elevation: active ? 6 : 2,
-            shadowColor: active ? activeColor : Colors.black,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(8),
-              child: Center(
-                child: Text(label,
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                        color: active ? Colors.white : S3Colors.dim)),
-              ),
+      // Panel master PADAT: slider volume presisi + mute/dim tersegmentasi +
+      // ringkasan input. Fader strip tetap jalan — ini editor presisinya,
+      // pola yang sama seperti EQ (grafik + strip + angka).
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ParamSlider(
+              label: 'VOLUME',
+              valueText: fmtDb(ctl.volDb),
+              value: ctl.volDb,
+              min: -60,
+              max: 0,
+              color: S3Colors.red,
+              onChanged: (v) => ctl.setVolDb(v, drag: true),
+              onEnd: () => ctl.setVolDb(ctl.volDb),
             ),
-          ),
-        );
-      }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('MASTER',
-              style: TextStyle(
-                  color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 14),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                bigBlock('MUTE', s.mute, S3Colors.muteRed,
-                    () => ctl.setMute(!s.mute)),
-                const SizedBox(width: 10),
-                bigBlock(
-                    'DIM', s.dim, S3Colors.blue, () => ctl.setDim(!s.dim)),
-              ],
+            ParamSegmented(
+              label: 'MUTE',
+              options: const ['OFF', 'ON'],
+              selected: s.mute ? 1 : 0,
+              onSelect: (i) => ctl.setMute(i == 1),
             ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Volume diatur dari fader strip MASTER di kiri — strip itu berlaku di semua mode.',
-            style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
-          ),
-        ],
+            ParamSegmented(
+              label: 'DIM',
+              options: const ['OFF', 'ON'],
+              selected: s.dim ? 1 : 0,
+              onSelect: (i) => ctl.setDim(i == 1),
+            ),
+            const SectionHead('RINGKASAN'),
+            const InfoRow(label: 'MODE', value: 'DLMS'),
+            InfoRow(
+                label: 'IN A',
+                value:
+                    '${d.inOnA ? 'Aktif' : 'Mati'} · ${fmtDb(d.inGainA)} · delay ${fmtNum(d.inDlyA, 1)} ms'),
+            InfoRow(
+                label: 'IN B',
+                value:
+                    '${d.inOnB ? 'Aktif' : 'Mati'} · ${fmtDb(d.inGainB)} · delay ${fmtNum(d.inDlyB, 1)} ms'),
+          ],
+        ),
       );
     }
     // OUT 1 / OUT 2
@@ -298,7 +285,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
     final c = d.ch[ch];
     switch (chip) {
       case 'Routing':
-        return _RoutingPanel(ctl: ctl, ch: ch, src: c.src);
+        return _RoutingPanel(ctl: ctl, ch: ch, c: c);
       case 'Crossover':
         return _CrossoverPanel(ctl: ctl, ch: ch, c: c, d: d);
       case 'Delay':
@@ -328,73 +315,43 @@ String _freqText(double f) => f >= 1000
 class _RoutingPanel extends StatelessWidget {
   final DeviceController ctl;
   final int ch;
-  final int src;
-  const _RoutingPanel({required this.ctl, required this.ch, required this.src});
+  final DlmsChState c;
+  const _RoutingPanel({required this.ctl, required this.ch, required this.c});
 
   @override
   Widget build(BuildContext context) {
-    const opts = [
-      ('A', 'Input A saja'),
-      ('B', 'Input B saja'),
-      ('A+B', 'Jumlah A + B'),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('SUMBER KANAL',
-            style: TextStyle(
-                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 14),
-        // Blok sumber mengisi tinggi panel (dulu mungil di tengah — ruang
-        // kosong di atas/bawahnya yang dikeluhkan user).
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < 3; i++)
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
-                    child: Material(
-                      color: src == i ? S3Colors.blue : S3Colors.card,
-                      elevation: src == i ? 6 : 2,
-                      shadowColor: src == i ? S3Colors.blue : Colors.black,
-                      borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        onTap: () => ctl.setChField(ch, 'src', '$i'),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(opts[i].$1,
-                                style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: src == i
-                                        ? Colors.white
-                                        : S3Colors.txt)),
-                            const SizedBox(height: 6),
-                            Text(opts[i].$2,
-                                style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: src == i
-                                        ? Colors.white70
-                                        : S3Colors.dim)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ParamSegmented(
+            label: 'SUMBER',
+            options: const ['A', 'B', 'A+B'],
+            selected: c.src.clamp(0, 2),
+            onSelect: (i) => ctl.setChField(ch, 'src', '$i'),
+            height: 44,
           ),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'Routing memilih sinyal masuk yang diolah kanal ini. A+B menjumlahkan kedua input (mis. untuk subwoofer mono).',
-          style: TextStyle(color: S3Colors.dim, fontSize: 12),
-        ),
-      ],
+          const SectionHead('RINGKASAN KANAL'),
+          InfoRow(label: 'HPF', value: c.hpfOn ? _freqText(c.hpfF) : 'Mati'),
+          InfoRow(label: 'LPF', value: c.lpfOn ? _freqText(c.lpfF) : 'Mati'),
+          InfoRow(label: 'TIPE', value: _tfNames[c.tf.clamp(0, 5)]),
+          InfoRow(
+              label: 'PEQ',
+              value: c.peqOn
+                  ? c.peq.map((g) => fmtDb(g)).join('  ·  ')
+                  : 'Mati'),
+          InfoRow(label: 'DELAY', value: '${fmtNum(c.dly, 2)} ms'),
+          InfoRow(label: 'LIMITER', value: fmtDb(c.lim)),
+          InfoRow(
+              label: 'FASE', value: c.pol ? 'Terbalik 180°' : 'Normal 0°'),
+          InfoRow(label: 'STATUS', value: c.on ? 'Aktif' : 'Mati'),
+          const SizedBox(height: 8),
+          const Text(
+            'A+B menjumlahkan kedua input (mis. untuk subwoofer mono). Detail tiap fungsi ada di chip-nya masing-masing.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -409,95 +366,83 @@ class _CrossoverPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Text('CROSSOVER',
-                style: TextStyle(
-                    color: S3Colors.dim,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold)),
-            const Spacer(),
-            const Text('TIPE',
-                style: TextStyle(color: S3Colors.dim, fontSize: 12)),
-            const SizedBox(width: 8),
-            Material(
-              color: S3Colors.card,
-              borderRadius: BorderRadius.circular(6),
-              child: InkWell(
-                onTap: () =>
-                    ctl.setChField(ch, 'tf', '${(c.tf + 1) % 6}'),
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                  child: Text(_tfNames[c.tf.clamp(0, 5)],
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // legenda overlay dua output
-        Row(
-          children: [
-            _legend(const Color(0xFF52C76E), 'OUT 1'),
-            const SizedBox(width: 14),
-            _legend(const Color(0xFFB78CE0), 'OUT 2'),
-            const SizedBox(width: 14),
-            const Text('garis tebal = kanal yang sedang diedit',
-                style: TextStyle(color: S3Colors.dim, fontSize: 11)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Expanded(
-          child: CustomPaint(
-            size: Size.infinite,
-            painter: _XoverPainter(c: c, d: d, selCh: ch),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Text('CROSSOVER',
+                  style: TextStyle(
+                      color: S3Colors.dim,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(width: 16),
+              _legend(const Color(0xFF52C76E), 'OUT 1'),
+              const SizedBox(width: 12),
+              _legend(const Color(0xFFB78CE0), 'OUT 2'),
+              const SizedBox(width: 12),
+              const Text('garis tebal = kanal yang sedang diedit',
+                  style: TextStyle(color: S3Colors.dim, fontSize: 11)),
+            ],
           ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _xoToggle('HPF', c.hpfOn,
-                () => ctl.setChField(ch, 'hpfOn', c.hpfOn ? '0' : '1')),
-            const SizedBox(width: 10),
-            S3Knob(
-              label: 'HPF',
-              valueText: _freqText(c.hpfF),
-              frac: fracOfLog(c.hpfF, 20, 20000),
-              arcColor: const Color(0xFFFAAC58),
-              diameter: 84,
-              onFrac: (f) => ctl.setChField(
-                  ch, 'hpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
-                  drag: true),
-              onEnd: () => ctl.setChField(
-                  ch, 'hpfF', c.hpfF.toStringAsFixed(1)),
+          const SizedBox(height: 6),
+          // Grafik titik potong OUT 1 vs OUT 2 (permintaan user) — tinggi
+          // tetap agar tidak lenyap di layar pendek; panel bisa digulir.
+          SizedBox(
+            height: 190,
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _XoverPainter(c: c, d: d, selCh: ch),
             ),
-            const SizedBox(width: 26),
-            _xoToggle('LPF', c.lpfOn,
-                () => ctl.setChField(ch, 'lpfOn', c.lpfOn ? '0' : '1')),
-            const SizedBox(width: 10),
-            S3Knob(
-              label: 'LPF',
-              valueText: _freqText(c.lpfF),
-              frac: fracOfLog(c.lpfF, 20, 20000),
-              arcColor: const Color(0xFF6ED0E4),
-              diameter: 84,
-              onFrac: (f) => ctl.setChField(
-                  ch, 'lpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
-                  drag: true),
-              onEnd: () => ctl.setChField(
-                  ch, 'lpfF', c.lpfF.toStringAsFixed(1)),
-            ),
-          ],
-        ),
-      ],
+          ),
+          ParamSegmented(
+            label: 'TIPE',
+            options: _tfNames,
+            selected: c.tf.clamp(0, 5),
+            onSelect: (i) => ctl.setChField(ch, 'tf', '$i'),
+            height: 34,
+          ),
+          ParamSegmented(
+            label: 'HPF',
+            options: const ['OFF', 'ON'],
+            selected: c.hpfOn ? 1 : 0,
+            onSelect: (i) => ctl.setChField(ch, 'hpfOn', i == 1 ? '1' : '0'),
+          ),
+          ParamSlider(
+            label: 'FREQ HPF',
+            valueText: _freqText(c.hpfF),
+            value: fracOfLog(c.hpfF, 20, 20000),
+            min: 0,
+            max: 1,
+            color: const Color(0xFFFAAC58),
+            enabled: c.hpfOn,
+            onChanged: (f) => ctl.setChField(
+                ch, 'hpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
+                drag: true),
+            onEnd: () => ctl.setChField(ch, 'hpfF', c.hpfF.toStringAsFixed(1)),
+          ),
+          ParamSegmented(
+            label: 'LPF',
+            options: const ['OFF', 'ON'],
+            selected: c.lpfOn ? 1 : 0,
+            onSelect: (i) => ctl.setChField(ch, 'lpfOn', i == 1 ? '1' : '0'),
+          ),
+          ParamSlider(
+            label: 'FREQ LPF',
+            valueText: _freqText(c.lpfF),
+            value: fracOfLog(c.lpfF, 20, 20000),
+            min: 0,
+            max: 1,
+            color: const Color(0xFF6ED0E4),
+            enabled: c.lpfOn,
+            onChanged: (f) => ctl.setChField(
+                ch, 'lpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
+                drag: true),
+            onEnd: () => ctl.setChField(ch, 'lpfF', c.lpfF.toStringAsFixed(1)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -516,28 +461,6 @@ class _CrossoverPanel extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 11.5, fontWeight: FontWeight.bold)),
       ],
-    );
-  }
-
-  Widget _xoToggle(String label, bool on, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Material(
-        color: on ? S3Colors.blue : S3Colors.card,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            child: Text('$label ${on ? 'ON' : 'OFF'}',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: on ? Colors.white : S3Colors.dim)),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -680,41 +603,87 @@ class _DelayPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('DELAY KANAL',
-            style: TextStyle(
-                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            S3Knob(
-              label: 'DELAY',
-              valueText: '${fmtNum(ms, 2)} ms',
-              frac: (ms / 20).clamp(0, 1).toDouble(),
-              arcColor: const Color(0xFF6ED0E4),
-              diameter: 170,
-              onFrac: (f) => ctl.setChField(
-                  ch, 'dly', (f * 20).toStringAsFixed(2),
-                  drag: true),
-              onEnd: () => ctl.setChField(ch, 'dly', ms.toStringAsFixed(2)),
-            ),
-            const SizedBox(width: 30),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'Setara jarak ≈ ${fmtNum(ms * 34.3, 0)} cm.\nUntuk menyelaraskan waktu tiba suara antar speaker (time alignment). Perubahan delay kini bebas bunyi "ciitt" berkat crossfade tap di firmware.',
-                  style: const TextStyle(color: S3Colors.dim, fontSize: 12.5),
-                ),
+    const quick = [0.0, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0];
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(fmtNum(ms, 2),
+                  style: const TextStyle(
+                      fontSize: 42, fontWeight: FontWeight.bold, height: 1)),
+              const SizedBox(width: 6),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 5),
+                child: Text('ms',
+                    style: TextStyle(
+                        color: S3Colors.dim,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
               ),
-            ),
-          ],
-        ),
-      ],
+              const Spacer(),
+              Text('≈ ${fmtNum(ms * 34.3, 0)} cm · ${(ms * 48).round()} sampel',
+                  style: const TextStyle(color: S3Colors.dim, fontSize: 12.5)),
+            ],
+          ),
+          ParamSlider(
+            label: 'DELAY',
+            valueText: '${fmtNum(ms, 2)} ms',
+            value: ms,
+            min: 0,
+            max: 20,
+            color: const Color(0xFF6ED0E4),
+            onChanged: (v) =>
+                ctl.setChField(ch, 'dly', v.toStringAsFixed(2), drag: true),
+            onEnd: () => ctl.setChField(ch, 'dly', ms.toStringAsFixed(2)),
+          ),
+          const SectionHead('SET CEPAT (ms)'),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              for (var i = 0; i < quick.length; i++)
+                Expanded(
+                  child: Padding(
+                    padding:
+                        EdgeInsets.only(right: i < quick.length - 1 ? 6 : 0),
+                    child: Material(
+                      color: (ms - quick[i]).abs() < 0.005
+                          ? S3Colors.blue
+                          : S3Colors.card,
+                      elevation: (ms - quick[i]).abs() < 0.005 ? 4 : 1.5,
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        onTap: () => ctl.setChField(
+                            ch, 'dly', quick[i].toStringAsFixed(2)),
+                        borderRadius: BorderRadius.circular(6),
+                        child: SizedBox(
+                          height: 36,
+                          child: Center(
+                            child: Text(
+                                fmtNum(quick[i], quick[i] % 1 == 0 ? 0 : 1),
+                                style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: (ms - quick[i]).abs() < 0.005
+                                        ? Colors.white
+                                        : S3Colors.dim)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SectionHead('KETERANGAN'),
+          const Text(
+            'Delay menyelaraskan waktu tiba suara antar speaker (time alignment): 1 ms ≈ 34,3 cm jarak tempuh suara. Perubahan delay bebas bunyi "ciitt" berkat crossfade tap di firmware.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -727,43 +696,100 @@ class _LimiterPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('LIMITER KANAL',
-            style: TextStyle(
-                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            S3Knob(
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ParamSlider(
+            label: 'AMBANG',
+            valueText: fmtDb(lim),
+            value: lim,
+            min: -24,
+            max: 0,
+            color: S3Colors.red,
+            onChanged: (v) =>
+                ctl.setChField(ch, 'lim', v.toStringAsFixed(2), drag: true),
+            onEnd: () => ctl.setChField(ch, 'lim', lim.toStringAsFixed(2)),
+          ),
+          const SectionHead('KURVA SOFT-CLIP (tanh)'),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 132,
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _LimPainter(lim: lim),
+            ),
+          ),
+          InfoRow(
               label: 'AMBANG',
-              valueText: fmtDb(lim),
-              frac: ((lim + 24) / 24).clamp(0, 1).toDouble(),
-              arcColor: S3Colors.red,
-              diameter: 170,
-              onFrac: (f) => ctl.setChField(
-                  ch, 'lim', (f * 24 - 24).toStringAsFixed(2),
-                  drag: true),
-              onEnd: () => ctl.setChField(ch, 'lim', lim.toStringAsFixed(2)),
-            ),
-            const SizedBox(width: 30),
-            const Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text(
-                  'Pembatas per kanal (soft-clip tanh). Sinyal di atas ambang dijepit halus agar power dan speaker aman dari puncak berlebih.',
-                  style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+              value: '${fmtDb(lim)} — di atas ini sinyal mulai dijepit'),
+          InfoRow(
+              label: 'REDUKSI',
+              value:
+                  'Puncak 0 dBFS tereduksi maks ≈ ${fmtNum(-lim, 1)} dB'),
+          const SizedBox(height: 8),
+          const Text(
+            'Pembatas per kanal (soft-clip tanh): puncak dijepit halus, bukan dipotong kasar, agar power dan speaker aman dari puncak berlebih.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
+}
+
+/// Ilustrasi bentuk penjepitan tanh + garis ambang (linear dari dB ambang).
+class _LimPainter extends CustomPainter {
+  final double lim;
+  _LimPainter({required this.lim});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()..color = const Color(0xFF101216);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Offset.zero & size, const Radius.circular(6)),
+        bg);
+    final w = size.width, h = size.height;
+    double xOf(double x) => (x / 1.25 * 0.5 + 0.5) * w;
+    double yOf(double y) => (0.5 - y / 1.25 * 0.5) * h;
+    final grid = Paint()
+      ..color = const Color(0xFF232830)
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(xOf(0), 6), Offset(xOf(0), h - 6), grid);
+    canvas.drawLine(Offset(6, yOf(0)), Offset(w - 6, yOf(0)), grid);
+    // garis ambang (putus-putus sederhana: segmen pendek)
+    final t = math.pow(10, lim / 20).toDouble();
+    final thr = Paint()
+      ..color = const Color(0xFFF47068)
+      ..strokeWidth = 1.2;
+    for (double y = 8; y < h - 8; y += 9) {
+      canvas.drawLine(Offset(xOf(t), y), Offset(xOf(t), y + 5), thr);
+      canvas.drawLine(Offset(xOf(-t), y), Offset(xOf(-t), y + 5), thr);
+    }
+    // kurva tanh: makin rendah ambang, lutut makin tajam
+    final a = 1.2 + (-lim / 24) * 3.4;
+    final path = Path();
+    for (var i = 0; i <= 120; i++) {
+      final x = -1.25 + 2.5 * i / 120;
+      final y = math.tanh(a * x) / math.tanh(a);
+      final px = xOf(x), py = yOf(y);
+      if (i == 0) {
+        path.moveTo(px, py);
+      } else {
+        path.lineTo(px, py);
+      }
+    }
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0xFF6ED0E4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2);
+  }
+
+  @override
+  bool shouldRepaint(_LimPainter old) => old.lim != lim;
 }
 
 class _FasePanel extends StatelessWidget {
@@ -774,81 +800,40 @@ class _FasePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('FASE & STATUS KANAL',
-            style: TextStyle(
-                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 14),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            Expanded(
-              child: Material(
-                color: c.pol ? S3Colors.muteRed : S3Colors.card,
-                elevation: c.pol ? 6 : 2,
-                shadowColor: c.pol ? S3Colors.muteRed : Colors.black,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  onTap: () =>
-                      ctl.setChField(ch, 'pol', c.pol ? '0' : '1'),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(c.pol ? 'TERBALIK 180°' : 'NORMAL 0°',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: c.pol ? Colors.white : S3Colors.txt)),
-                        const SizedBox(height: 4),
-                        const Text('Ketuk untuk membalik fase',
-                            style: TextStyle(
-                                fontSize: 11.5, color: S3Colors.dim)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Material(
-                color: c.on ? S3Colors.blue : S3Colors.card,
-                elevation: c.on ? 6 : 2,
-                shadowColor: c.on ? S3Colors.blue : Colors.black,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  onTap: () => ctl.setChOn(ch, !c.on),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(c.on ? 'KANAL AKTIF' : 'KANAL MATI',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: c.on ? Colors.white : S3Colors.txt)),
-                        const SizedBox(height: 4),
-                        const Text('Sama dengan tombol MUTE di strip',
-                            style: TextStyle(
-                                fontSize: 11.5, color: S3Colors.dim)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ParamSegmented(
+            label: 'FASE',
+            options: const ['NORMAL 0°', 'TERBALIK 180°'],
+            selected: c.pol ? 1 : 0,
+            onSelect: (i) => ctl.setChField(ch, 'pol', i == 1 ? '1' : '0'),
+            height: 42,
           ),
-        ),
-      ],
+          ParamSegmented(
+            label: 'STATUS',
+            options: const ['MATI', 'AKTIF'],
+            selected: c.on ? 1 : 0,
+            onSelect: (i) => ctl.setChOn(ch, i == 1),
+            height: 42,
+          ),
+          const SectionHead('RINGKASAN KANAL'),
+          InfoRow(
+              label: 'SUMBER',
+              value: const ['A', 'B', 'A+B'][c.src.clamp(0, 2)]),
+          InfoRow(label: 'GAIN', value: fmtDb(c.gain)),
+          InfoRow(label: 'HPF', value: c.hpfOn ? _freqText(c.hpfF) : 'Mati'),
+          InfoRow(label: 'LPF', value: c.lpfOn ? _freqText(c.lpfF) : 'Mati'),
+          InfoRow(label: 'DELAY', value: '${fmtNum(c.dly, 2)} ms'),
+          InfoRow(label: 'LIMITER', value: fmtDb(c.lim)),
+          const SizedBox(height: 8),
+          const Text(
+            'Fase terbalik membalik polaritas kanal ini 180° — berguna bila satu speaker terpasang terbalik, atau untuk mencocokkan sub dengan top.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -871,7 +856,8 @@ class _PeqPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final gains = chState.peq;
     final g = gains[band];
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -886,7 +872,8 @@ class _PeqPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Expanded(
+        SizedBox(
+          height: 168,
           child: LayoutBuilder(builder: (context, cons) {
             final size = Size(cons.maxWidth, cons.maxHeight);
             return GestureDetector(
@@ -974,12 +961,30 @@ class _PeqPanel extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        // Tanpa kenop (koreksi user): gain diatur dengan menyeret titik di
-        // grafik; baris ini cukup petunjuk + tombol reset band.
+        const SizedBox(height: 10),
+        // Slider gain per band: pasangan presisi dari seretan titik di
+        // grafik (pola editor EQ profesional: grafik + tabel angka) —
+        // mengisi panel dan memudahkan setelan halus di HP.
+        for (var i = 0; i < 3; i++)
+          ParamSlider(
+            label: 'B${i + 1} ${_PeqPanel._freqLabel(dlmsBandFreqs[i])}',
+            valueText: fmtDb(gains[i]),
+            value: gains[i],
+            min: -15,
+            max: 15,
+            color: dlmsBandColors[i],
+            enabled: chState.peqOn,
+            onChanged: (v) {
+              onBand(i);
+              ctl.setChPeqGain(ch, i, v, drag: true);
+            },
+            onEnd: () => ctl.setChPeqGain(ch, i, gains[i]),
+          ),
+        const SizedBox(height: 6),
+        // Baris petunjuk + reset band terpilih.
         Row(
           children: [
-            const Text('Seret titik di grafik untuk mengubah gain',
+            const Text('Seret titik di grafik, atau geser slider band di atas',
                 style: TextStyle(color: S3Colors.dim, fontSize: 12)),
             const Spacer(),
             Material(
@@ -999,6 +1004,7 @@ class _PeqPanel extends StatelessWidget {
           ],
         ),
       ],
+      ),
     );
   }
 

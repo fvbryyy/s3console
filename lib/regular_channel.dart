@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'device_controller.dart';
 import 'models.dart';
 import 'theme.dart';
+import 'widgets_param.dart';
 import 'widgets_strip.dart';
 
 /// CHANNEL mode REGULER mengikuti rancangan layar 2: strip INPUT USB /
@@ -231,58 +232,181 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
   }
 
   Widget _trimPanel(DspState s, bool left) {
+    final trim = left ? s.trimL : s.trimR;
     final pol = left ? s.polL : s.polR;
-    // Trim diatur dari fader strip OUT (kenop TRIM dobel dicabut);
-    // panel ini khusus fase output.
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('FASE OUTPUT',
-            style: TextStyle(
-                color: S3Colors.dim,
-                fontSize: 12,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _onToggle('FASE', pol,
-            () => ctl.setParam(left ? 'polL' : 'polR', pol ? 0 : 1)),
-        const SizedBox(height: 12),
-        const SizedBox(
-          width: 380,
-          child: Text(
-            'Trim output (±12 dB) diatur dari fader strip-nya di kiri. Fase membalik polaritas 180° — berguna bila salah satu speaker terpasang terbalik.',
-            style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
+    final dly = left ? s.dlyL : s.dlyR;
+    final lvl = left ? ctl.meter.l : ctl.meter.r;
+    // Editor output PADAT (rombakan total): trim presisi + DELAY output
+    // (dlyL/dlyR — parameter nyata yang belum pernah tampil di aplikasi) +
+    // fase tersegmentasi + meter level kanal ini.
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ParamSlider(
+            label: 'TRIM',
+            valueText: fmtDb(trim),
+            value: trim,
+            min: -12,
+            max: 12,
+            color: S3Colors.plate,
+            onChanged: (v) =>
+                ctl.setParam(left ? 'trimL' : 'trimR', v, drag: true),
+            onEnd: () => ctl.setParam(left ? 'trimL' : 'trimR', trim),
           ),
+          ParamSlider(
+            label: 'DELAY',
+            valueText: '${fmtNum(dly, 1)} ms',
+            value: dly,
+            min: 0,
+            max: 20,
+            color: const Color(0xFF6ED0E4),
+            onChanged: (v) =>
+                ctl.setParam(left ? 'dlyL' : 'dlyR', v, drag: true),
+            onEnd: () => ctl.setParam(left ? 'dlyL' : 'dlyR', dly),
+          ),
+          ParamSegmented(
+            label: 'FASE',
+            options: const ['NORMAL 0°', 'TERBALIK 180°'],
+            selected: pol ? 1 : 0,
+            onSelect: (i) =>
+                ctl.setParam(left ? 'polL' : 'polR', i.toDouble()),
+          ),
+          const SectionHead('LEVEL KANAL INI'),
+          const SizedBox(height: 4),
+          _hMeter(lvl),
+          const SizedBox(height: 8),
+          Text(
+            'Delay output menyelaraskan waktu tiba antara OUT 1 dan OUT 2 (di sini ≈ ${fmtNum(dly * 34.3, 0)} cm). Fase membalik polaritas 180° — berguna bila salah satu speaker terpasang terbalik.',
+            style: const TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Meter level horizontal untuk satu kanal (dari meter.l / meter.r).
+  Widget _hMeter(double level) {
+    final frac = level.clamp(0, 1).toDouble();
+    final color = frac > 0.89
+        ? const Color(0xFFF47068)
+        : (frac > 0.7 ? const Color(0xFFF8CD37) : const Color(0xFF34C76E));
+    return Row(
+      children: [
+        const SizedBox(
+          width: 96,
+          child: Text('LEVEL',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: S3Colors.dim)),
+        ),
+        Expanded(
+          child: Container(
+            height: 12,
+            decoration: BoxDecoration(
+              color: const Color(0xFF101216),
+              border: Border.all(color: S3Colors.line),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: frac,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 88,
+          child: Text('${(frac * 100).round()} %',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 12.5, fontWeight: FontWeight.bold)),
         ),
       ],
     );
   }
 
   Widget _masterPanel(DspState s) {
-    // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut).
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('MASTER REGULER',
-            style: TextStyle(
-                color: S3Colors.dim,
-                fontSize: 12,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _onToggle('MUTE', s.mute, () => ctl.setMute(!s.mute)),
-            const SizedBox(width: 10),
-            _onToggle('DIM', s.dim, () => ctl.setDim(!s.dim)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Volume diatur dari fader strip MASTER di kiri.',
-          style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
-        ),
-      ],
+    // Panel mastering PADAT: volume presisi + mute/dim + loudness + cek
+    // mono + width + balance — semua parameter master rantai reguler dalam
+    // satu panel (dulu cuma dua tombol kecil di ruang kosong besar).
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ParamSlider(
+            label: 'VOLUME',
+            valueText: fmtDb(ctl.volDb),
+            value: ctl.volDb,
+            min: -60,
+            max: 0,
+            color: S3Colors.red,
+            onChanged: (v) => ctl.setVolDb(v, drag: true),
+            onEnd: () => ctl.setVolDb(ctl.volDb),
+          ),
+          ParamSegmented(
+            label: 'MUTE',
+            options: const ['OFF', 'ON'],
+            selected: s.mute ? 1 : 0,
+            onSelect: (i) => ctl.setMute(i == 1),
+          ),
+          ParamSegmented(
+            label: 'DIM',
+            options: const ['OFF', 'ON'],
+            selected: s.dim ? 1 : 0,
+            onSelect: (i) => ctl.setDim(i == 1),
+          ),
+          ParamSegmented(
+            label: 'LOUDNESS',
+            options: const ['OFF', 'ON'],
+            selected: s.loud ? 1 : 0,
+            onSelect: (i) => ctl.setParam('loud', i.toDouble()),
+          ),
+          ParamSegmented(
+            label: 'CEK MONO',
+            options: const ['OFF', 'ON'],
+            selected: s.mono ? 1 : 0,
+            onSelect: (i) => ctl.setParam('mono', i.toDouble()),
+          ),
+          ParamSlider(
+            label: 'WIDTH',
+            valueText: fmtNum(s.width, 2),
+            value: s.width,
+            min: 0,
+            max: 2,
+            color: const Color(0xFFB78CE0),
+            onChanged: (v) => ctl.setParam('width', v, drag: true),
+            onEnd: () => ctl.setParam('width', s.width),
+          ),
+          ParamSlider(
+            label: 'BALANCE',
+            valueText: s.balance == 0
+                ? 'TENGAH'
+                : (s.balance < 0
+                    ? 'KIRI ${fmtNum(-s.balance * 100, 0)}'
+                    : 'KANAN ${fmtNum(s.balance * 100, 0)}'),
+            value: s.balance,
+            min: -1,
+            max: 1,
+            color: const Color(0xFFFAAC58),
+            onChanged: (v) => ctl.setParam('balance', v, drag: true),
+            onEnd: () => ctl.setParam('balance', s.balance),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Width 1,00 = stereo normal (0 = mono, 2 = ekstra lebar). Loudness menebalkan bass/treble di volume kecil; Cek Mono menggabung L+R untuk memeriksa kompatibilitas mono.',
+            style: TextStyle(color: S3Colors.dim, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 
