@@ -117,6 +117,7 @@ class DlmsState {
 
 class DspState {
   String net, fw;
+  int ur, ov; // statistik underrun/overflow dari /api/state
   double preamp, trimL, trimR;
   bool polL, polR;
   bool hpfOn;
@@ -146,6 +147,8 @@ class DspState {
   DspState({
     this.net = '',
     this.fw = '',
+    this.ur = 0,
+    this.ov = 0,
     this.preamp = 0,
     this.trimL = 0,
     this.trimR = 0,
@@ -195,6 +198,8 @@ class DspState {
   factory DspState.fromJson(Map<String, dynamic> j) => DspState(
         net: j['net']?.toString() ?? '',
         fw: j['fw']?.toString() ?? '',
+        ur: _i(j['ur']),
+        ov: _i(j['ov']),
         preamp: _d(j['preamp']),
         trimL: _d(j['trimL']),
         trimR: _d(j['trimR']),

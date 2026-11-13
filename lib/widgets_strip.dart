@@ -11,6 +11,12 @@ double dbToFrac(double db) =>
     ((db - stripDbMin) / (stripDbMax - stripDbMin)).clamp(0.0, 1.0).toDouble();
 double fracToDb(double f) => stripDbMin + f * (stripDbMax - stripDbMin);
 
+/// Pemetaan logaritmik untuk kenop (frekuensi, attack, release).
+double fracOfLog(double v, double min, double max) =>
+    (math.log(v / min) / math.log(max / min)).clamp(0.0, 1.0).toDouble();
+double valOfLog(double f, double min, double max) =>
+    min * math.pow(max / min, f).toDouble();
+
 class DesignStrip extends StatelessWidget {
   final String name;
   final String gainText;
@@ -23,6 +29,12 @@ class DesignStrip extends StatelessWidget {
   final ValueChanged<double> onFaderDb; // dipanggil kontinu saat seret
   final VoidCallback onFaderEnd;
   final VoidCallback onMute;
+  // penyesuaian untuk strip reguler (rentang & tombol kaki berbeda)
+  final double dbMin;
+  final double dbMax;
+  final List<String>? scaleLabels;
+  final String footLabel;
+  final Color? footActiveColor;
   const DesignStrip({
     super.key,
     required this.name,
@@ -36,6 +48,11 @@ class DesignStrip extends StatelessWidget {
     required this.onFaderDb,
     required this.onFaderEnd,
     required this.onMute,
+    this.dbMin = stripDbMin,
+    this.dbMax = stripDbMax,
+    this.scaleLabels,
+    this.footLabel = 'MUTE',
+    this.footActiveColor,
   });
 
   @override
@@ -86,10 +103,13 @@ class DesignStrip extends StatelessWidget {
             const SizedBox(height: 6),
             Expanded(
               child: _StripFader(
-                frac: dbToFrac(faderDb),
+                frac: ((faderDb - dbMin) / (dbMax - dbMin))
+                    .clamp(0.0, 1.0)
+                    .toDouble(),
                 meterFrac: meterFrac,
                 master: master,
-                onFrac: (f) => onFaderDb(fracToDb(f)),
+                labels: scaleLabels,
+                onFrac: (f) => onFaderDb(dbMin + f * (dbMax - dbMin)),
                 onEnd: onFaderEnd,
               ),
             ),
@@ -98,7 +118,9 @@ class DesignStrip extends StatelessWidget {
               height: 36,
               width: double.infinity,
               child: Material(
-                color: muted ? S3Colors.muteRed : S3Colors.card,
+                color: muted
+                    ? (footActiveColor ?? S3Colors.muteRed)
+                    : S3Colors.card,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(7),
                   side: muted
@@ -109,7 +131,7 @@ class DesignStrip extends StatelessWidget {
                   onTap: onMute,
                   borderRadius: BorderRadius.circular(7),
                   child: Center(
-                    child: Text('MUTE',
+                    child: Text(footLabel,
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -130,12 +152,14 @@ class _StripFader extends StatelessWidget {
   final double frac;
   final double meterFrac;
   final bool master;
+  final List<String>? labels;
   final ValueChanged<double> onFrac;
   final VoidCallback onEnd;
   const _StripFader({
     required this.frac,
     required this.meterFrac,
     required this.master,
+    required this.labels,
     required this.onFrac,
     required this.onEnd,
   });
@@ -155,7 +179,7 @@ class _StripFader extends StatelessWidget {
         child: CustomPaint(
           size: Size(c.maxWidth, c.maxHeight),
           painter: _StripFaderPainter(
-              frac: frac, meterFrac: meterFrac, master: master),
+              frac: frac, meterFrac: meterFrac, master: master, labels: labels),
         ),
       );
     });
@@ -166,8 +190,12 @@ class _StripFaderPainter extends CustomPainter {
   final double frac;
   final double meterFrac;
   final bool master;
+  final List<String>? labels;
   _StripFaderPainter(
-      {required this.frac, required this.meterFrac, required this.master});
+      {required this.frac,
+      required this.meterFrac,
+      required this.master,
+      required this.labels});
 
   static const _scale = ['+12', '+6', '0', '-6', '-12', '-24', '-36', '-48', '-60'];
 
@@ -178,13 +206,14 @@ class _StripFaderPainter extends CustomPainter {
     const top = 8.0, bot = 8.0;
     final railTop = top, railBot = size.height - bot;
     final railH = railBot - railTop;
+    final scale = labels ?? _scale;
 
     // angka skala
-    for (var i = 0; i < _scale.length; i++) {
-      final y = railTop + railH * i / (_scale.length - 1);
+    for (var i = 0; i < scale.length; i++) {
+      final y = railTop + railH * i / (scale.length - 1);
       final tp = TextPainter(
         text: TextSpan(
-            text: _scale[i],
+            text: scale[i],
             style: const TextStyle(color: S3Colors.dim, fontSize: 8.5)),
         textDirection: TextDirection.ltr,
       )..layout();

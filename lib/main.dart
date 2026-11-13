@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 import 'channel_screen.dart';
 import 'device_controller.dart';
 import 'eq_screen.dart';
+import 'regular_channel.dart';
 import 'rta_screen.dart';
+import 'tabs_misc.dart';
 import 'theme.dart';
 
 void main() {
@@ -69,6 +71,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!triedAuto) {
         triedAuto = true;
+        await widget.ctl.loadSavedHost();
+        if (mounted) hostCtl.text = widget.ctl.host;
         await widget.ctl.connect(hostCtl.text);
       }
     });
@@ -392,7 +396,7 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          const Text('Preset: —',
+          Text('Preset: ${ctl.lastPreset}',
               style: TextStyle(color: S3Colors.dim, fontSize: 12.5)),
           const Spacer(),
           Container(
@@ -445,20 +449,19 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
   Widget _body(DeviceController ctl, dynamic s) {
     switch (tabs[tab]) {
       case 'CHANNEL':
-        return ChannelScreen(ctl: ctl);
+        return s.dlms.on
+            ? ChannelScreen(ctl: ctl)
+            : RegularChannelScreen(ctl: ctl);
       case 'EQ':
         return EqScreen(ctl: ctl, onOpenDlms: () => setState(() => tab = 0));
       case 'RTA':
         return RtaScreen(ctl: ctl);
       case 'PRESET':
-        return _placeholder(
-            'Tab PRESET menyusul — daftar preset pabrik + 10 slot user, simpan/muat, dan ekspor-impor JSON seperti panel web.');
+        return PresetScreen(ctl: ctl);
       case 'PENGATURAN':
-        return _placeholder(
-            'Tab PENGATURAN menyusul — auto-save, reset setelan & reset pabrik, dan info koneksi (mengikuti tab Sistem panel web).');
+        return PengaturanScreen(ctl: ctl);
       case 'INFO':
-        return _placeholder(
-            'Tab INFO menyusul — versi firmware, statistik underrun/overflow/flush, dan credit Developed by bryyy.');
+        return InfoScreen(ctl: ctl);
       default:
         return const SizedBox.shrink();
     }

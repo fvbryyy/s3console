@@ -35,4 +35,20 @@ class DeviceApi {
         .timeout(const Duration(seconds: 3));
     if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
   }
+
+  /// Muat preset: name = 'flat'|'speaker'|'vokal'|'bass'|'malam' atau 'user:<i>'.
+  Future<void> loadPreset(String name) async {
+    final r = await http
+        .post(_u('/api/preset'), body: {'name': name})
+        .timeout(const Duration(seconds: 3));
+    if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
+  }
+
+  /// Simpan keadaan sekarang ke slot user (0-based).
+  Future<void> saveSlot(int slot) async {
+    final r = await http
+        .post(_u('/api/save'), body: {'slot': '$slot'})
+        .timeout(const Duration(seconds: 3));
+    if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
+  }
 }

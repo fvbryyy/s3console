@@ -1,10 +1,11 @@
 // Tab CHANNEL mode DLMS — persis rancangan layar 1 (v22):
 // strip IN A / IN B / OUT 1 / OUT 2 / MASTER + panel detail ber-chip fungsi.
-// Fungsi PEQ hidup penuh; Routing/Crossover/Delay/Limiter/Fase menyusul.
+// Semua fungsi hidup: PEQ, Routing, Crossover, Delay, Limiter, Fase.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'device_controller.dart';
 import 'models.dart';
+import 'regular_channel.dart';
 import 'theme.dart';
 import 'widgets_strip.dart';
 
@@ -28,22 +29,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
     final ctl = widget.ctl;
     final s = ctl.state!;
     if (!s.dlms.on) {
-      return Center(
-        child: Container(
-          width: 470,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: S3Colors.panel,
-            border: Border.all(color: S3Colors.line),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text(
-            'Layar CHANNEL reguler (Noise Gate & Compressor) menyusul increment berikutnya. Sementara tab EQ reguler dan panel web tetap bisa dipakai.',
-            style: TextStyle(color: S3Colors.dim, fontSize: 13),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
+      // Mode reguler: layar CHANNEL-nya sendiri (Gate/Compressor).
+      return RegularChannelScreen(ctl: ctl);
     }
     final d = s.dlms;
     return Padding(
@@ -280,21 +267,480 @@ class _ChannelScreenState extends State<ChannelScreen> {
     // OUT 1 / OUT 2
     final ch = sel - 2;
     final c = d.ch[ch];
-    if (chip != 'PEQ') {
-      return Center(
-        child: Text(
-          'Panel $chip untuk ${_names[sel]} menyusul increment berikutnya.\nNilai sekarang bisa diatur dari panel web (mbahdac.local).',
-          style: const TextStyle(color: S3Colors.dim, fontSize: 13),
-          textAlign: TextAlign.center,
-        ),
-      );
+    switch (chip) {
+      case 'Routing':
+        return _RoutingPanel(ctl: ctl, ch: ch, src: c.src);
+      case 'Crossover':
+        return _CrossoverPanel(ctl: ctl, ch: ch, c: c);
+      case 'Delay':
+        return _DelayPanel(ctl: ctl, ch: ch, ms: c.dly);
+      case 'Limiter':
+        return _LimiterPanel(ctl: ctl, ch: ch, lim: c.lim);
+      case 'Fase':
+        return _FasePanel(ctl: ctl, ch: ch, c: c);
+      default:
+        return _PeqPanel(
+          ctl: ctl,
+          ch: ch,
+          chState: c,
+          band: peqBand,
+          onBand: (b) => setState(() => peqBand = b),
+        );
     }
-    return _PeqPanel(
-      ctl: ctl,
-      ch: ch,
-      chState: c,
-      band: peqBand,
-      onBand: (b) => setState(() => peqBand = b),
+  }
+}
+
+const _tfNames = ['LR 12', 'LR 24', 'LR 48', 'BW 12', 'BW 24', 'BW 48'];
+
+String _freqText(double f) => f >= 1000
+    ? '${fmtNum(f / 1000, f >= 10000 ? 0 : 2)} kHz'
+    : '${f.round()} Hz';
+
+class _RoutingPanel extends StatelessWidget {
+  final DeviceController ctl;
+  final int ch;
+  final int src;
+  const _RoutingPanel({required this.ctl, required this.ch, required this.src});
+
+  @override
+  Widget build(BuildContext context) {
+    const opts = [
+      ('A', 'Input A saja'),
+      ('B', 'Input B saja'),
+      ('A+B', 'Jumlah A + B'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('SUMBER KANAL',
+            style: TextStyle(
+                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            for (var i = 0; i < 3; i++)
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
+                  child: Material(
+                    color: src == i ? S3Colors.blue : S3Colors.card,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: () => ctl.setChField(ch, 'src', '$i'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        child: Column(
+                          children: [
+                            Text(opts[i].$1,
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: src == i
+                                        ? Colors.white
+                                        : S3Colors.txt)),
+                            const SizedBox(height: 4),
+                            Text(opts[i].$2,
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: src == i
+                                        ? Colors.white70
+                                        : S3Colors.dim)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Routing memilih sinyal masuk yang diolah kanal ini. A+B menjumlahkan kedua input (mis. untuk subwoofer mono).',
+          style: TextStyle(color: S3Colors.dim, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _CrossoverPanel extends StatelessWidget {
+  final DeviceController ctl;
+  final int ch;
+  final DlmsChState c;
+  const _CrossoverPanel({required this.ctl, required this.ch, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Text('CROSSOVER',
+                style: TextStyle(
+                    color: S3Colors.dim,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+            const Spacer(),
+            const Text('TIPE',
+                style: TextStyle(color: S3Colors.dim, fontSize: 12)),
+            const SizedBox(width: 8),
+            Material(
+              color: S3Colors.card,
+              borderRadius: BorderRadius.circular(6),
+              child: InkWell(
+                onTap: () =>
+                    ctl.setChField(ch, 'tf', '${(c.tf + 1) % 6}'),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                  child: Text(_tfNames[c.tf.clamp(0, 5)],
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: _XoverPainter(c: c),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _xoToggle('HPF', c.hpfOn,
+                () => ctl.setChField(ch, 'hpfOn', c.hpfOn ? '0' : '1')),
+            const SizedBox(width: 10),
+            S3Knob(
+              label: 'HPF',
+              valueText: _freqText(c.hpfF),
+              frac: fracOfLog(c.hpfF, 20, 20000),
+              arcColor: const Color(0xFFFAAC58),
+              diameter: 84,
+              onFrac: (f) => ctl.setChField(
+                  ch, 'hpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
+                  drag: true),
+              onEnd: () => ctl.setChField(
+                  ch, 'hpfF', c.hpfF.toStringAsFixed(1)),
+            ),
+            const SizedBox(width: 26),
+            _xoToggle('LPF', c.lpfOn,
+                () => ctl.setChField(ch, 'lpfOn', c.lpfOn ? '0' : '1')),
+            const SizedBox(width: 10),
+            S3Knob(
+              label: 'LPF',
+              valueText: _freqText(c.lpfF),
+              frac: fracOfLog(c.lpfF, 20, 20000),
+              arcColor: const Color(0xFF6ED0E4),
+              diameter: 84,
+              onFrac: (f) => ctl.setChField(
+                  ch, 'lpfF', valOfLog(f, 20, 20000).toStringAsFixed(1),
+                  drag: true),
+              onEnd: () => ctl.setChField(
+                  ch, 'lpfF', c.lpfF.toStringAsFixed(1)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _xoToggle(String label, bool on, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: on ? S3Colors.blue : S3Colors.card,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Text('$label ${on ? 'ON' : 'OFF'}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: on ? Colors.white : S3Colors.dim)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Magnitudo pendekatan untuk gambar: BW orde o -> 1/sqrt(1+x^o);
+/// LR orde o -> 1/(1+x^o). x = fc/f (HP) atau f/fc (LP).
+double _xoMag(bool hp, double fc, int tf, double f) {
+  final order = [2, 4, 8][tf % 3];
+  final x = hp ? fc / f : f / fc;
+  final xp = math.pow(x, order).toDouble();
+  return tf < 3 ? 1 / (1 + xp) : 1 / math.sqrt(1 + xp);
+}
+
+class _XoverPainter extends CustomPainter {
+  final DlmsChState c;
+  _XoverPainter({required this.c});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          Offset.zero & size, const Radius.circular(7)),
+      Paint()..color = const Color(0xFF0F1114),
+    );
+    double yOf(double mag) =>
+        14 + (1 - mag.clamp(0.0, 1.0)) * (size.height - 44);
+    // garis -3 dB penanda
+    final y3 = yOf(0.707);
+    canvas.drawLine(Offset(8, y3), Offset(size.width - 8, y3),
+        Paint()..color = const Color(0xFF2C3542)..strokeWidth = 1);
+    Path pathFor(bool hpToo) {
+      final p = Path();
+      const steps = 130;
+      for (var i = 0; i <= steps; i++) {
+        final x = size.width * i / steps;
+        final f = _xToF(x, size.width);
+        var m = 1.0;
+        if (c.hpfOn) m *= _xoMag(true, c.hpfF, c.tf, f);
+        if (c.lpfOn) m *= _xoMag(false, c.lpfF, c.tf, f);
+        if (!hpToo) m = 1.0; // placeholder tak dipakai
+        final y = yOf(m);
+        i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
+      }
+      return p;
+    }
+
+    if (c.hpfOn) {
+      final p = Path();
+      const steps = 130;
+      for (var i = 0; i <= steps; i++) {
+        final x = size.width * i / steps;
+        final f = _xToF(x, size.width);
+        final y = yOf(_xoMag(true, c.hpfF, c.tf, f));
+        i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
+      }
+      canvas.drawPath(
+          p,
+          Paint()
+            ..color = const Color(0xFFFAAC58)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6);
+    }
+    if (c.lpfOn) {
+      final p = Path();
+      const steps = 130;
+      for (var i = 0; i <= steps; i++) {
+        final x = size.width * i / steps;
+        final f = _xToF(x, size.width);
+        final y = yOf(_xoMag(false, c.lpfF, c.tf, f));
+        i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
+      }
+      canvas.drawPath(
+          p,
+          Paint()
+            ..color = const Color(0xFF6ED0E4)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6);
+    }
+    // gabungan (putih)
+    canvas.drawPath(
+      pathFor(true),
+      Paint()
+        ..color = const Color(0xFFF0F4F8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4,
+    );
+    // label frekuensi
+    for (final f in [20.0, 100.0, 1000.0, 10000.0, 20000.0]) {
+      final x = _fToX(f, size.width);
+      final tp = TextPainter(
+        text: TextSpan(
+            text: f >= 1000 ? '${(f / 1000).round()}k' : '${f.round()}',
+            style: const TextStyle(color: S3Colors.dim, fontSize: 9)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x - tp.width / 2, size.height - 14));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_XoverPainter old) => true;
+}
+
+class _DelayPanel extends StatelessWidget {
+  final DeviceController ctl;
+  final int ch;
+  final double ms;
+  const _DelayPanel({required this.ctl, required this.ch, required this.ms});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('DELAY KANAL',
+            style: TextStyle(
+                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            S3Knob(
+              label: 'DELAY',
+              valueText: '${fmtNum(ms, 2)} ms',
+              frac: (ms / 20).clamp(0, 1).toDouble(),
+              arcColor: const Color(0xFF6ED0E4),
+              diameter: 110,
+              onFrac: (f) => ctl.setChField(
+                  ch, 'dly', (f * 20).toStringAsFixed(2),
+                  drag: true),
+              onEnd: () => ctl.setChField(ch, 'dly', ms.toStringAsFixed(2)),
+            ),
+            const SizedBox(width: 30),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  'Setara jarak ≈ ${fmtNum(ms * 34.3, 0)} cm.\nUntuk menyelaraskan waktu tiba suara antar speaker (time alignment). Perubahan delay kini bebas bunyi "ciitt" berkat crossfade tap di firmware.',
+                  style: const TextStyle(color: S3Colors.dim, fontSize: 12.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LimiterPanel extends StatelessWidget {
+  final DeviceController ctl;
+  final int ch;
+  final double lim;
+  const _LimiterPanel({required this.ctl, required this.ch, required this.lim});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('LIMITER KANAL',
+            style: TextStyle(
+                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            S3Knob(
+              label: 'AMBANG',
+              valueText: fmtDb(lim),
+              frac: ((lim + 24) / 24).clamp(0, 1).toDouble(),
+              arcColor: S3Colors.red,
+              diameter: 110,
+              onFrac: (f) => ctl.setChField(
+                  ch, 'lim', (f * 24 - 24).toStringAsFixed(2),
+                  drag: true),
+              onEnd: () => ctl.setChField(ch, 'lim', lim.toStringAsFixed(2)),
+            ),
+            const SizedBox(width: 30),
+            const Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: Text(
+                  'Pembatas per kanal (soft-clip tanh). Sinyal di atas ambang dijepit halus agar power dan speaker aman dari puncak berlebih.',
+                  style: TextStyle(color: S3Colors.dim, fontSize: 12.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FasePanel extends StatelessWidget {
+  final DeviceController ctl;
+  final int ch;
+  final DlmsChState c;
+  const _FasePanel({required this.ctl, required this.ch, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('FASE & STATUS KANAL',
+            style: TextStyle(
+                color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Material(
+                color: c.pol ? S3Colors.muteRed : S3Colors.card,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: () =>
+                      ctl.setChField(ch, 'pol', c.pol ? '0' : '1'),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: Column(
+                      children: [
+                        Text(c.pol ? 'TERBALIK 180°' : 'NORMAL 0°',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: c.pol ? Colors.white : S3Colors.txt)),
+                        const SizedBox(height: 4),
+                        const Text('Ketuk untuk membalik fase',
+                            style: TextStyle(
+                                fontSize: 11.5, color: S3Colors.dim)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Material(
+                color: c.on ? S3Colors.blue : S3Colors.card,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: () => ctl.setChOn(ch, !c.on),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: Column(
+                      children: [
+                        Text(c.on ? 'KANAL AKTIF' : 'KANAL MATI',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: c.on ? Colors.white : S3Colors.txt)),
+                        const SizedBox(height: 4),
+                        const Text('Sama dengan tombol MUTE di strip',
+                            style: TextStyle(
+                                fontSize: 11.5, color: S3Colors.dim)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
