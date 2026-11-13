@@ -80,11 +80,10 @@ class DeviceController extends ChangeNotifier {
       if (_meterBusy) return;
       _meterBusy = true;
       try {
-        meter = await _api!.fetchMeter();
-        if (state != null && state!.dirty != meter.dirty) {
-          state!.dirty = meter.dirty;
+        _meterTgt = await _api!.fetchMeter();
+        if (state != null && state!.dirty != _meterTgt.dirty) {
+          state!.dirty = _meterTgt.dirty;
         }
-        notifyListeners();
       } catch (_) {/* abaikan sesaat; putus total ditangani reconnect manual */}
       _meterBusy = false;
     });
@@ -92,18 +91,72 @@ class DeviceController extends ChangeNotifier {
       if (_rtaBusy) return;
       _rtaBusy = true;
       try {
-        rta = await _api!.fetchRta();
-        notifyListeners();
+        _rtaTgt = await _api!.fetchRta();
+        if (rta.length != 31 && _rtaTgt.length >= 31) {
+          rta = List.of(_rtaTgt); // jepret pertama: langsung penuh
+        }
       } catch (_) {}
       _rtaBusy = false;
     });
+    // Animasi tampilan 50 ms — peniru panel web asli: panel mengambil data
+    // pada laju yang sama (meter 200 ms, RTA 150 ms) tapi MENGGAMBAR tiap
+    // 50 ms dengan nilai yang dilicinkan (attack 0,55 / release 0,16),
+    // jadi gerakannya mengalir. Aplikasi dulu menggambar nilai mentah
+    // seirama polling -> patah-patah dan terasa "lag / kayak ga nyambung"
+    // (koreksi user 2026-11-13 20:32, terbukti dari sumber panel).
+    _animTimer =
+        Timer.periodic(const Duration(milliseconds: 50), (_) => _animTick());
+  }
+
+  MeterData _meterTgt = const MeterData();
+  List<double> _rtaTgt = const [];
+  Timer? _animTimer;
+
+  void _animTick() {
+    var changed = false;
+    double ease(double cur, double tgt, double up, double down) {
+      final d = tgt - cur;
+      if (d.abs() < 0.0005) return cur;
+      changed = true;
+      return cur + d * (d > 0 ? up : down);
+    }
+
+    final nl = ease(meter.l, _meterTgt.l, 0.6, 0.12);
+    final nr = ease(meter.r, _meterTgt.r, 0.6, 0.12);
+    final metaChanged = meter.gr != _meterTgt.gr ||
+        meter.clip != _meterTgt.clip ||
+        meter.dirty != _meterTgt.dirty ||
+        meter.flt != _meterTgt.flt;
+    if (changed || metaChanged) {
+      meter = MeterData(
+        l: nl,
+        r: nr,
+        gr: _meterTgt.gr,
+        clip: _meterTgt.clip,
+        dirty: _meterTgt.dirty,
+        flt: _meterTgt.flt,
+      );
+      changed = true;
+    }
+    if (rta.length >= 31 && _rtaTgt.length >= 31) {
+      for (var i = 0; i < 31; i++) {
+        final d = _rtaTgt[i] - rta[i];
+        if (d.abs() > 0.05) {
+          rta[i] += d * (d > 0 ? 0.55 : 0.16);
+          changed = true;
+        }
+      }
+    }
+    if (changed) notifyListeners();
   }
 
   void _stopPolling() {
     _meterTimer?.cancel();
     _rtaTimer?.cancel();
+    _animTimer?.cancel();
     _meterTimer = null;
     _rtaTimer = null;
+    _animTimer = null;
   }
 
   /// Kirim seketika (tombol, saklar, nilai akhir seretan).
