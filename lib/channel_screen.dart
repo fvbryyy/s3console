@@ -417,34 +417,24 @@ class _PeqPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        // Tanpa kenop (koreksi user): gain diatur dengan menyeret titik di
+        // grafik; baris ini cukup petunjuk + tombol reset band.
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            S3Knob(
-              label: 'GAIN',
-              valueText: fmtDb(g),
-              frac: (g + 15) / 30,
-              arcColor: S3Colors.yellow,
-              diameter: 84,
-              onFrac: (f) => ctl.setChPeqGain(ch, band, f * 30 - 15, drag: true),
-              onEnd: () => ctl.setChPeqGain(ch, band, gains[band]),
-            ),
-            const SizedBox(width: 30),
-            Expanded(
-              child: Container(
-                height: 48,
-                margin: const EdgeInsets.only(top: 8),
-                child: Material(
-                  color: S3Colors.card,
-                  borderRadius: BorderRadius.circular(7),
-                  child: InkWell(
-                    onTap: () => ctl.setChPeqGain(ch, band, 0),
-                    borderRadius: BorderRadius.circular(7),
-                    child: Center(
-                      child: Text('Reset band ${band + 1}',
-                          style: const TextStyle(color: S3Colors.dim)),
-                    ),
-                  ),
+            const Text('Seret titik di grafik untuk mengubah gain',
+                style: TextStyle(color: S3Colors.dim, fontSize: 12)),
+            const Spacer(),
+            Material(
+              color: S3Colors.card,
+              borderRadius: BorderRadius.circular(7),
+              child: InkWell(
+                onTap: () => ctl.setChPeqGain(ch, band, 0),
+                borderRadius: BorderRadius.circular(7),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  child: Text('Reset band ${band + 1}',
+                      style: const TextStyle(color: S3Colors.dim, fontSize: 12.5)),
                 ),
               ),
             ),
