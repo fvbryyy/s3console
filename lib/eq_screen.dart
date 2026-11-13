@@ -67,20 +67,50 @@ class EqScreen extends StatelessWidget {
     final s = ctl.state;
     if (s == null) return const SizedBox.shrink();
     if (s.dlms.on) {
-      // Sesuai rancangan: mode DLMS aktif -> tab EQ reguler dilewati (bypass).
+      // Persis rancangan layar 3: pemberitahuan bypass di kartu tengah.
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.block, color: S3Colors.dim, size: 40),
-            const SizedBox(height: 10),
-            const Text('Mode DLMS aktif — EQ reguler dilewati (bypass).',
-                style: TextStyle(color: S3Colors.dim, fontSize: 14)),
+            Container(
+              width: 560,
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
+              decoration: BoxDecoration(
+                color: S3Colors.panel,
+                border: Border.all(color: S3Colors.line),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('EQ REGULER SEDANG TER-BYPASS',
+                      style: TextStyle(
+                          fontSize: 19, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Mode DLMS aktif — rantai EQ, Gate, dan Compressor reguler tidak dipakai.\nPEQ tersedia per output di tab CHANNEL.',
+                    style: TextStyle(color: S3Colors.dim, fontSize: 13.5),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: S3Colors.blue,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 34, vertical: 13),
+                    ),
+                    onPressed: onOpenDlms,
+                    child: const Text('BUKA PEQ DLMS',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 14),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: S3Colors.blue),
-              onPressed: onOpenDlms,
-              child: const Text('BUKA PEQ DLMS'),
+            const Text(
+              'Atau matikan DLMS lewat saklar di kanan atas untuk memakai EQ 10 band.',
+              style: TextStyle(color: S3Colors.dim, fontSize: 12),
             ),
           ],
         ),

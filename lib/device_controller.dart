@@ -181,6 +181,14 @@ class DeviceController extends ChangeNotifier {
     sendNow({'mute': m ? '1' : '0'});
   }
 
+  void setDim(bool on) {
+    final s = state;
+    if (s == null) return;
+    s.dim = on;
+    notifyListeners();
+    sendNow({'dim': on ? '1' : '0'});
+  }
+
   void setDlmsOn(bool on) {
     final s = state;
     if (s == null) return;
@@ -196,6 +204,122 @@ class DeviceController extends ChangeNotifier {
       state!.dirty = false;
       notifyListeners();
     }
+  }
+
+  // ---- DLMS -----------------------------------------------------------------
+
+  void setInGain(bool isA, double db, {bool drag = false}) {
+    final s = state;
+    if (s == null) return;
+    final v = db.clamp(-60, 12).toDouble();
+    if (isA) {
+      s.dlms.inGainA = v;
+    } else {
+      s.dlms.inGainB = v;
+    }
+    notifyListeners();
+    final kv = {isA ? 'inGainA' : 'inGainB': v.toStringAsFixed(2)};
+    drag ? sendDrag(isA ? 'inA' : 'inB', kv) : sendNow(kv);
+  }
+
+  void setInOn(bool isA, bool on) {
+    final s = state;
+    if (s == null) return;
+    if (isA) {
+      s.dlms.inOnA = on;
+    } else {
+      s.dlms.inOnB = on;
+    }
+    notifyListeners();
+    sendNow({isA ? 'inOnA' : 'inOnB': on ? '1' : '0'});
+  }
+
+  void setInDelay(bool isA, double ms, {bool drag = false}) {
+    final s = state;
+    if (s == null) return;
+    final v = ms.clamp(0, 100).toDouble();
+    if (isA) {
+      s.dlms.inDlyA = v;
+    } else {
+      s.dlms.inDlyB = v;
+    }
+    notifyListeners();
+    final kv = {isA ? 'inDlyA' : 'inDlyB': v.toStringAsFixed(2)};
+    drag ? sendDrag(isA ? 'inDlyA' : 'inDlyB', kv) : sendNow(kv);
+  }
+
+  void setChGain(int ch, double db, {bool drag = false}) {
+    final s = state;
+    if (s == null || ch < 0 || ch >= s.dlms.ch.length) return;
+    final v = db.clamp(-60, 12).toDouble();
+    s.dlms.ch[ch].gain = v;
+    notifyListeners();
+    final kv = {'c${ch}_gain': v.toStringAsFixed(2)};
+    drag ? sendDrag('ch$ch', kv) : sendNow(kv);
+  }
+
+  void setChOn(int ch, bool on) {
+    final s = state;
+    if (s == null || ch < 0 || ch >= s.dlms.ch.length) return;
+    s.dlms.ch[ch].on = on;
+    notifyListeners();
+    sendNow({'c${ch}_on': on ? '1' : '0'});
+  }
+
+  void setChPeqGain(int ch, int band, double db, {bool drag = false}) {
+    final s = state;
+    if (s == null || ch < 0 || ch >= s.dlms.ch.length) return;
+    final v = db.clamp(-15, 15).toDouble();
+    s.dlms.ch[ch].peq[band] = v;
+    notifyListeners();
+    final kv = {'c${ch}_p$band': v.toStringAsFixed(2)};
+    drag ? sendDrag('ch${ch}p$band', kv) : sendNow(kv);
+  }
+
+  /// Bidang DLMS lain (routing/crossover/delay/limiter/fase) — dipakai panel
+  /// fungsi pada increment berikutnya; nilai setempat diperbarui seperlunya.
+  void setChField(int ch, String field, String value) {
+    final s = state;
+    if (s == null || ch < 0 || ch >= s.dlms.ch.length) return;
+    final c = s.dlms.ch[ch];
+    final v = double.tryParse(value) ?? 0;
+    switch (field) {
+      case 'src':
+        c.src = v.toInt();
+        break;
+      case 'hpfOn':
+        c.hpfOn = v != 0;
+        break;
+      case 'hpfF':
+        c.hpfF = v;
+        break;
+      case 'lpfOn':
+        c.lpfOn = v != 0;
+        break;
+      case 'lpfF':
+        c.lpfF = v;
+        break;
+      case 'tf':
+        c.tf = v.toInt();
+        break;
+      case 'peqOn':
+        c.peqOn = v != 0;
+        break;
+      case 'gain':
+        c.gain = v;
+        break;
+      case 'dly':
+        c.dly = v;
+        break;
+      case 'lim':
+        c.lim = v;
+        break;
+      case 'pol':
+        c.pol = v != 0;
+        break;
+    }
+    notifyListeners();
+    sendNow({'c${ch}_$field': value});
   }
 
   Future<void> refreshState() async {

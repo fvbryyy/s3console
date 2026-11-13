@@ -19,7 +19,26 @@ class S3Colors {
   static const rose = Color(0xFFE58F8F);
   static const amber = Color(0xFFE8A33D); // titik "belum tersimpan"
   static const graphBg = Color(0xFF101216);
+  // token tambahan persis rancangan v22 (appmock_s3air.py)
+  static const plate = Color(0xFF2FBF71); // pil nama kanal di panel detail
+  static const accb = Color(0xFF7EE2A8); // teks hijau muda "Terhubung"/subjudul
+  static const slate = Color(0xFF54606E); // blok REGULER aktif pada saklar mode
+  static const accDark = Color(0xFF08120C); // teks gelap di atas hijau
+  static const meterGreen = Color(0xFF34C76E); // segmen meter bawah
+  static const rtaBar = Color(0xFF2B5475); // batang spektrum gaya rancangan
+  static const rtaCap = Color(0xFF40A8A0); // topi batang spektrum
+  static const capRed = Color(0xFFCD3C30); // kap fader master (blok merah)
 }
+
+/// Warna 3 band PEQ DLMS pada rancangan: merah, kuning, hijau.
+const dlmsBandColors = <Color>[
+  Color(0xFFF26D6D),
+  Color(0xFFF8CD37),
+  Color(0xFF52C76E),
+];
+
+/// Frekuensi tetap 3 band PEQ DLMS (firmware): 100 Hz, 1 kHz, 8 kHz.
+const dlmsBandFreqs = <double>[100, 1000, 8000];
 
 /// Warna titik tiap band PEQ (selaras panel web).
 const bandColors = <Color>[
