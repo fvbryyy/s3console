@@ -36,7 +36,7 @@ class DeviceController extends ChangeNotifier {
       // Ingat alat ini: buka berikutnya langsung menyambung (rancangan layar 0).
       SharedPreferences.getInstance()
           .then((p) => p.setString('s3host', host))
-          .catchError((_) {});
+          .catchError((_) => false);
       connecting = false;
       _startPolling();
       notifyListeners();

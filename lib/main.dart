@@ -466,21 +466,4 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
         return const SizedBox.shrink();
     }
   }
-
-  Widget _placeholder(String msg) {
-    return Center(
-      child: Container(
-        width: 460,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: S3Colors.panel,
-          border: Border.all(color: S3Colors.line),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(msg,
-            style: const TextStyle(color: S3Colors.dim, fontSize: 13),
-            textAlign: TextAlign.center),
-      ),
-    );
-  }
 }

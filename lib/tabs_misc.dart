@@ -187,7 +187,7 @@ class PengaturanScreen extends StatelessWidget {
             'Keadaan tersimpan sendiri beberapa saat setelah ada perubahan (menimpa blob yang sama di NVS — tidak memenuhi memori).',
             Switch(
               value: s.autosave,
-              activeColor: S3Colors.green,
+              activeThumbColor: S3Colors.green,
               onChanged: (v) => ctl.setParam('autosave', v ? 1 : 0),
             ),
           ),

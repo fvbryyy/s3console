@@ -97,8 +97,8 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
       ),
       DesignStrip(
         name: 'MASTER',
-        gainText: ctl.meter.clip > 0 ? 'CLIP' : fmtNum(s.vol, 0),
-        faderDb: s.vol,
+        gainText: ctl.meter.clip ? 'CLIP' : fmtDb(ctl.volDb),
+        faderDb: ctl.volDb,
         meterFrac: math.max(mL, mR),
         selected: sel == 3,
         muted: s.mute,
@@ -107,8 +107,8 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
         dbMax: 0,
         scaleLabels: _volScale,
         onTap: () => setState(() => sel = 3),
-        onFaderDb: (db) => ctl.setVol(db, drag: true),
-        onFaderEnd: () => ctl.setVol(s.vol),
+        onFaderDb: (db) => ctl.setVolDb(db.clamp(-60, 0).toDouble(), drag: true),
+        onFaderEnd: () => ctl.setVolDb(ctl.volDb),
         onMute: () => ctl.setMute(!s.mute),
       ),
     ];
@@ -296,12 +296,12 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
           children: [
             S3Knob(
               label: 'VOLUME',
-              valueText: fmtNum(s.vol, 0),
-              frac: ((s.vol + 60) / 60).clamp(0, 1).toDouble(),
+              valueText: fmtDb(ctl.volDb),
+              frac: ((ctl.volDb + 60) / 60).clamp(0, 1).toDouble(),
               arcColor: S3Colors.red,
               diameter: 110,
-              onFrac: (f) => ctl.setVol(f * 60 - 60, drag: true),
-              onEnd: () => ctl.setVol(s.vol),
+              onFrac: (f) => ctl.setVolDb(f * 60 - 60, drag: true),
+              onEnd: () => ctl.setVolDb(ctl.volDb),
             ),
             const SizedBox(width: 26),
             Column(
