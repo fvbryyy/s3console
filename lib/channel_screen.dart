@@ -605,9 +605,45 @@ class _DelayPanel extends StatelessWidget {
   final double ms;
   const _DelayPanel({required this.ctl, required this.ch, required this.ms});
 
+  static double? _parseMs(String t) =>
+      double.tryParse(t.trim().replaceAll(',', '.'));
+
+  Future<void> _editManual(BuildContext context) async {
+    final tec = TextEditingController(text: fmtNum(ms, 2));
+    final v = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: S3Colors.panel,
+        title: const Text('Isi delay manual', style: TextStyle(fontSize: 16)),
+        content: TextField(
+          controller: tec,
+          autofocus: true,
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(hintText: '0 – 80 ms'),
+          onSubmitted: (t) => Navigator.pop(ctx, _parseMs(t)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('BATAL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _parseMs(tec.text)),
+            child: const Text('SET'),
+          ),
+        ],
+      ),
+    );
+    tec.dispose();
+    if (v != null) {
+      ctl.setChField(ch, 'dly', v.clamp(0, 80).toDouble().toStringAsFixed(2));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    const quick = [0.0, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0];
+    const quick = [0.0, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 40.0, 80.0];
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,17 +651,36 @@ class _DelayPanel extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(fmtNum(ms, 2),
-                  style: const TextStyle(
-                      fontSize: 42, fontWeight: FontWeight.bold, height: 1)),
-              const SizedBox(width: 6),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 5),
-                child: Text('ms',
-                    style: TextStyle(
-                        color: S3Colors.dim,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold)),
+              // Ketuk angka = isi manual lewat ketikan (permintaan user:
+              // slider saja tidak cukup presisi/cepat untuk nilai besar).
+              InkWell(
+                onTap: () => _editManual(context),
+                borderRadius: BorderRadius.circular(6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(fmtNum(ms, 2),
+                        style: const TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                            height: 1)),
+                    const SizedBox(width: 6),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 5),
+                      child: Text('ms',
+                          style: TextStyle(
+                              color: S3Colors.dim,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 7),
+                      child: Icon(Icons.edit,
+                          size: 15, color: S3Colors.dim),
+                    ),
+                  ],
+                ),
               ),
               const Spacer(),
               Text('≈ ${fmtNum(ms * 34.3, 0)} cm · ${(ms * 48).round()} sampel',
@@ -637,7 +692,7 @@ class _DelayPanel extends StatelessWidget {
             valueText: '${fmtNum(ms, 2)} ms',
             value: ms,
             min: 0,
-            max: 20,
+            max: 80,
             color: const Color(0xFF6ED0E4),
             onChanged: (v) =>
                 ctl.setChField(ch, 'dly', v.toStringAsFixed(2), drag: true),
