@@ -1,4 +1,5 @@
-// Pengendali alat: memegang state, menjalankan polling meter/RTA seperti
+// Pengendali alat: memegang state, menjalankan polling meter/RTA (gabungan
+// 150 ms sejak firmware v5.2.4; fallback 200+150 ms di firmware lama) seperti
 // panel web (200/150 ms), dan meneruskan perubahan ke /api/set.
 // Nilai yang sedang diseret diterapkan setempat lebih dulu (terasa seketika),
 // pengiriman ke alat di-throttle ±30 ms selama seretan.
@@ -76,13 +77,26 @@ class DeviceController extends ChangeNotifier {
     // Penjaga in-flight: jangan menumpuk permintaan baru selama yang lama
     // belum pulang — penumpukan di server ESP + antrean koneksi peramban
     // membuat meter terlihat "mati lalu hidup" (beku lama, lalu meloncat).
-    _meterTimer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
+    _meterTimer = Timer.periodic(const Duration(milliseconds: 150), (_) async {
       if (_meterBusy) return;
       _meterBusy = true;
       try {
         _meterTgt = await _api!.fetchMeter();
         if (state != null && state!.dirty != _meterTgt.dirty) {
           state!.dirty = _meterTgt.dirty;
+        }
+        // Firmware v5.2.4+: RTA datang sekalian dalam respons meter ->
+        // matikan polling /api/rta terpisah (permintaan ke alat turun
+        // dari +-12/detik menjadi +-7/detik). Firmware lama: bidang rta
+        // kosong, timer RTA tetap berjalan seperti biasa.
+        final rt = _meterTgt.rta;
+        if (rt != null && rt.length >= 31) {
+          _rtaTgt = rt;
+          if (rta.length != 31) rta = List.of(rt);
+          if (_rtaTimer != null) {
+            _rtaTimer!.cancel();
+            _rtaTimer = null;
+          }
         }
       } catch (_) {/* abaikan sesaat; putus total ditangani reconnect manual */}
       _meterBusy = false;

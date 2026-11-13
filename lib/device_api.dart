@@ -17,13 +17,13 @@ class DeviceApi {
   }
 
   Future<MeterData> fetchMeter() async {
-    final r = await http.get(_u('/api/meter')).timeout(const Duration(seconds: 2));
+    final r = await http.get(_u('/api/meter')).timeout(const Duration(seconds: 1));
     if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
     return MeterData.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   Future<List<double>> fetchRta() async {
-    final r = await http.get(_u('/api/rta')).timeout(const Duration(seconds: 2));
+    final r = await http.get(_u('/api/rta')).timeout(const Duration(seconds: 1));
     if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
     final j = jsonDecode(r.body) as Map<String, dynamic>;
     return (j['rta'] as List? ?? const []).map((e) => (e as num).toDouble()).toList();

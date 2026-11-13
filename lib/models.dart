@@ -250,6 +250,10 @@ class MeterData {
   final double l, r, gr;
   final bool clip, dirty;
   final int flt;
+
+  /// RTA 31 band ikut dalam respons meter sejak firmware v5.2.4
+  /// (null pada firmware lama -> aplikasi tetap polling /api/rta sendiri).
+  final List<double>? rta;
   const MeterData({
     this.l = 0,
     this.r = 0,
@@ -257,6 +261,7 @@ class MeterData {
     this.clip = false,
     this.dirty = false,
     this.flt = 0,
+    this.rta,
   });
   factory MeterData.fromJson(Map<String, dynamic> j) => MeterData(
         l: _d(j['l']),
@@ -265,5 +270,8 @@ class MeterData {
         clip: _i(j['clip']) != 0,
         dirty: _i(j['dirty']) != 0,
         flt: _i(j['flt']),
+        rta: j['rta'] is List
+            ? [for (final v in j['rta'] as List) _d(v)]
+            : null,
       );
 }
