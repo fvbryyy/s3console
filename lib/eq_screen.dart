@@ -160,7 +160,7 @@ class _Graph extends StatelessWidget {
           if (best >= 0) {
             dragBand = best;
             ctl.selectedBand = best;
-            ctl.notifyListeners();
+            ctl.touch();
           }
         },
         onPanUpdate: (d) {
@@ -355,7 +355,7 @@ class _EditorRow extends StatelessWidget {
                         ),
                         onSelected: (_) {
                           ctl.selectedBand = i;
-                          ctl.notifyListeners();
+                          ctl.touch();
                         },
                       ),
                     ),
@@ -517,7 +517,7 @@ class _Bank extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     ctl.selectedBand = i;
-                    ctl.notifyListeners();
+                    ctl.touch();
                   },
                   child: Container(
                     width: 74,

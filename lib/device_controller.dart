@@ -59,6 +59,10 @@ class DeviceController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Picu gambar ulang dari luar (mis. pilihan band di layar EQ) tanpa
+  /// memanggil notifyListeners yang terproteksi.
+  void touch() => notifyListeners();
+
   void disconnect() {
     _stopPolling();
     connected = false;
