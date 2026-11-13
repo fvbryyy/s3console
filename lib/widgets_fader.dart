@@ -184,6 +184,8 @@ class StripFootButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: active ? activeColor : S3Colors.card,
+      elevation: active ? 5 : 2,
+      shadowColor: active ? activeColor : Colors.black,
       borderRadius: BorderRadius.circular(4),
       child: InkWell(
         onTap: onTap,

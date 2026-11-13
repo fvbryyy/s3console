@@ -460,6 +460,8 @@ class _StepBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: S3Colors.card,
+      elevation: 2,
+      shadowColor: Colors.black,
       borderRadius: BorderRadius.circular(4),
       child: InkWell(
         onTap: onTap,
@@ -482,6 +484,8 @@ class _MiniToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: active ? S3Colors.blue : S3Colors.card,
+      elevation: active ? 5 : 2,
+      shadowColor: active ? S3Colors.blue : Colors.black,
       borderRadius: BorderRadius.circular(4),
       child: InkWell(
         onTap: onTap,
@@ -530,13 +534,19 @@ class _Bank extends StatelessWidget {
                     width: 74,
                     margin: const EdgeInsets.all(4),
                     padding: const EdgeInsets.fromLTRB(5, 5, 5, 5),
-                    decoration: BoxDecoration(
-                      color: S3Colors.strip,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: selected ? S3Colors.cyan : S3Colors.line,
-                        width: selected ? 2 : 1,
-                      ),
+                    decoration: s3Raised(
+                      S3Colors.strip,
+                      radius: 6,
+                      borderColor: selected ? S3Colors.cyan : null,
+                      borderWidth: selected ? 2 : 1,
+                      shadows: selected
+                          ? const [
+                              BoxShadow(
+                                  color: Color(0x5938C7E0),
+                                  blurRadius: 12,
+                                  offset: Offset(0, 3)),
+                            ]
+                          : null,
                     ),
                     child: Column(
                       children: [

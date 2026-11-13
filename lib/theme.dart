@@ -70,3 +70,36 @@ ThemeData buildS3Theme() {
 String fmtNum(double v, [int dec = 1]) =>
     v.toStringAsFixed(dec).replaceAll('.', ',');
 String fmtDb(double v, [int dec = 1]) => '${fmtNum(v, dec)} dB';
+
+/// Sistem kedalaman visual ("perspektif"): permukaan yang bisa ditekan /
+/// penting dibuat TERANGKAT — gradasi vertikal halus (terang di atas, gelap
+/// di bawah), tepi atas lebih terang, dan bayangan lembut di bawahnya.
+/// Bidang data (grafik, meter) tetap cekung gelap agar kontrasnya jelas:
+/// mata langsung tahu mana tombol, mana tampilan.
+LinearGradient s3Grad(Color base) => LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color.lerp(base, Colors.white, 0.08)!,
+        Color.lerp(base, Colors.black, 0.18)!,
+      ],
+    );
+
+BoxDecoration s3Raised(Color base,
+    {double radius = 9,
+    Color? borderColor,
+    double borderWidth = 1,
+    List<BoxShadow>? shadows}) {
+  return BoxDecoration(
+    gradient: s3Grad(base),
+    border: Border.all(
+        color: borderColor ?? Color.lerp(base, Colors.white, 0.12)!,
+        width: borderWidth),
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: shadows ??
+        const [
+          BoxShadow(
+              color: Color(0x59000000), blurRadius: 10, offset: Offset(0, 4)),
+        ],
+  );
+}

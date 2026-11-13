@@ -58,11 +58,7 @@ class PresetScreen extends StatelessWidget {
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: S3Colors.panel,
-                  border: Border.all(color: S3Colors.line),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: s3Raised(S3Colors.panel, radius: 8),
                 child: Row(
                   children: [
                     Text('Slot ${i + 1}',
@@ -109,6 +105,8 @@ class PresetScreen extends StatelessWidget {
   Widget _bigButton(BuildContext context, String label, VoidCallback onTap) {
     return Material(
       color: S3Colors.card,
+      elevation: 2,
+      shadowColor: Colors.black,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -126,6 +124,8 @@ class PresetScreen extends StatelessWidget {
   Widget _smallButton(String label, VoidCallback? onTap) {
     return Material(
       color: S3Colors.card,
+      elevation: 2,
+      shadowColor: Colors.black,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,
@@ -251,11 +251,7 @@ class PengaturanScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: S3Colors.panel,
-          border: Border.all(color: S3Colors.line),
-          borderRadius: BorderRadius.circular(8),
-        ),
+        decoration: s3Raised(S3Colors.panel, radius: 8),
         child: Row(
           children: [
             Expanded(
@@ -283,6 +279,8 @@ class PengaturanScreen extends StatelessWidget {
   Widget _btn(String label, VoidCallback onTap, {bool danger = false}) {
     return Material(
       color: S3Colors.card,
+      elevation: 2,
+      shadowColor: Colors.black,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,
@@ -353,11 +351,7 @@ class InfoScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: S3Colors.panel,
-          border: Border.all(color: S3Colors.line),
-          borderRadius: BorderRadius.circular(8),
-        ),
+        decoration: s3Raised(S3Colors.panel, radius: 8),
         child: Row(
           children: [
             SizedBox(

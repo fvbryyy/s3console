@@ -197,6 +197,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                             style: FilledButton.styleFrom(
                               backgroundColor: S3Colors.green,
                               foregroundColor: S3Colors.accDark,
+                              elevation: 6,
+                              shadowColor: S3Colors.green,
                               padding:
                                   const EdgeInsets.symmetric(vertical: 15),
                             ),
@@ -326,6 +328,8 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
                       padding: const EdgeInsets.only(right: 6),
                       child: Material(
                         color: i == tab ? S3Colors.blue : Colors.transparent,
+                        elevation: i == tab ? 5 : 0,
+                        shadowColor: S3Colors.blue,
                         borderRadius: BorderRadius.circular(7),
                         child: InkWell(
                           onTap: () => setState(() => tab = i),
@@ -376,6 +380,8 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
         : S3Colors.dim;
     return Material(
       color: bg,
+      elevation: active ? 5 : 1.5,
+      shadowColor: active ? bg : Colors.black,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,
@@ -420,6 +426,8 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: S3Colors.blue,
+                    elevation: 4,
+                    shadowColor: S3Colors.blue,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                   ),
                   onPressed: () => ctl.saveAll(),

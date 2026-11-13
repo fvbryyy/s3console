@@ -60,13 +60,19 @@ class DesignStrip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(
-          color: S3Colors.strip,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected ? S3Colors.cyan : S3Colors.line,
-            width: selected ? 2.5 : 1,
-          ),
+        decoration: s3Raised(
+          S3Colors.strip,
+          radius: 8,
+          borderColor: selected ? S3Colors.cyan : null,
+          borderWidth: selected ? 2.5 : 1,
+          shadows: selected
+              ? const [
+                  BoxShadow(
+                      color: Color(0x5938C7E0),
+                      blurRadius: 14,
+                      offset: Offset(0, 3)),
+                ]
+              : null,
         ),
         padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
         child: Column(
@@ -121,6 +127,9 @@ class DesignStrip extends StatelessWidget {
                 color: muted
                     ? (footActiveColor ?? S3Colors.muteRed)
                     : S3Colors.card,
+                elevation: muted ? 6 : 2,
+                shadowColor:
+                    muted ? (footActiveColor ?? S3Colors.muteRed) : Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(7),
                   side: muted
@@ -234,8 +243,24 @@ class _StripFaderPainter extends CustomPainter {
     final capRect =
         Rect.fromLTWH(railX - capW / 2, capY - capH / 2, capW, capH);
     final rr = RRect.fromRectAndRadius(capRect, const Radius.circular(4));
+    // bayangan kap (kap terangkat dari rel)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+          capRect.shift(const Offset(0, 3)), const Radius.circular(4)),
+      Paint()
+        ..color = const Color(0x66000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
     canvas.drawRRect(
         rr, Paint()..color = master ? S3Colors.capRed : const Color(0xFF343A42));
+    // kilau tepi atas kap
+    canvas.drawLine(
+      Offset(capRect.left + 3, capRect.top + 1.5),
+      Offset(capRect.right - 3, capRect.top + 1.5),
+      Paint()
+        ..color = const Color(0x59FFFFFF)
+        ..strokeWidth = 1.4,
+    );
     canvas.drawRRect(
       rr,
       Paint()
@@ -343,8 +368,25 @@ class _KnobPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
     final r = size.width / 2 - 4;
-    // badan kenop
-    canvas.drawCircle(c, r, Paint()..color = const Color(0xFF0D0F12));
+    // bayangan kenop (kedalaman: kenop terangkat dari panel)
+    canvas.drawCircle(
+      c + const Offset(0, 3.5),
+      r,
+      Paint()
+        ..color = const Color(0x73000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    // badan kenop: gradasi radial agar terasa cembung
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.35, -0.4),
+          radius: 0.95,
+          colors: const [Color(0xFF3A4149), Color(0xFF14171B)],
+        ).createShader(Rect.fromCircle(center: c, radius: r)),
+    );
     canvas.drawCircle(
       c,
       r,

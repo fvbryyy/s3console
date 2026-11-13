@@ -128,11 +128,7 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
 
   Widget _detail(DspState s) {
     return Container(
-      decoration: BoxDecoration(
-        color: S3Colors.panel,
-        border: Border.all(color: S3Colors.line),
-        borderRadius: BorderRadius.circular(9),
-      ),
+      decoration: s3Raised(S3Colors.panel, radius: 9),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -216,6 +212,8 @@ class _RegularChannelScreenState extends State<RegularChannelScreen> {
   Widget _onToggle(String label, bool on, VoidCallback onTap) {
     return Material(
       color: on ? S3Colors.blue : S3Colors.card,
+      elevation: on ? 5 : 2,
+      shadowColor: on ? S3Colors.blue : Colors.black,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,

@@ -120,11 +120,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
   Widget _detail(DeviceController ctl, DspState s) {
     final d = s.dlms;
     return Container(
-      decoration: BoxDecoration(
-        color: S3Colors.panel,
-        border: Border.all(color: S3Colors.line),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: s3Raised(S3Colors.panel, radius: 8),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -134,11 +130,11 @@ class _ChannelScreenState extends State<ChannelScreen> {
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: sel == 4
+                decoration: s3Raised(
+                  sel == 4
                       ? S3Colors.capRed
                       : (sel < 2 ? S3Colors.blue : S3Colors.plate),
-                  borderRadius: BorderRadius.circular(7),
+                  radius: 7,
                 ),
                 child: Text(_names[sel],
                     style: TextStyle(
@@ -177,6 +173,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
   Widget _chipBtn(String label, bool active, VoidCallback onTap) {
     return Material(
       color: active ? S3Colors.blue : S3Colors.card,
+      elevation: active ? 5 : 2,
+      shadowColor: active ? S3Colors.blue : Colors.black,
       borderRadius: BorderRadius.circular(7),
       child: InkWell(
         onTap: onTap,
@@ -249,6 +247,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
         return Expanded(
           child: Material(
             color: active ? activeColor : S3Colors.card,
+            elevation: active ? 6 : 2,
+            shadowColor: active ? activeColor : Colors.black,
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               onTap: onTap,
@@ -357,6 +357,8 @@ class _RoutingPanel extends StatelessWidget {
                     padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
                     child: Material(
                       color: src == i ? S3Colors.blue : S3Colors.card,
+                      elevation: src == i ? 6 : 2,
+                      shadowColor: src == i ? S3Colors.blue : Colors.black,
                       borderRadius: BorderRadius.circular(8),
                       child: InkWell(
                         onTap: () => ctl.setChField(ch, 'src', '$i'),
@@ -786,6 +788,8 @@ class _FasePanel extends StatelessWidget {
             Expanded(
               child: Material(
                 color: c.pol ? S3Colors.muteRed : S3Colors.card,
+                elevation: c.pol ? 6 : 2,
+                shadowColor: c.pol ? S3Colors.muteRed : Colors.black,
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   onTap: () =>
@@ -815,6 +819,8 @@ class _FasePanel extends StatelessWidget {
             Expanded(
               child: Material(
                 color: c.on ? S3Colors.blue : S3Colors.card,
+                elevation: c.on ? 6 : 2,
+                shadowColor: c.on ? S3Colors.blue : Colors.black,
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   onTap: () => ctl.setChOn(ch, !c.on),
