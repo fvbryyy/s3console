@@ -738,6 +738,13 @@ class _LimiterPanel extends StatelessWidget {
   }
 }
 
+/// tanh manual — dart:math TIDAK punya tanh/sinh/cosh (error analyzer
+/// 2026-11-13). tanh(x) = (e^{2x} − 1) / (e^{2x} + 1).
+double _tanh(double x) {
+  final e = math.exp(2 * x);
+  return (e - 1) / (e + 1);
+}
+
 /// Ilustrasi bentuk penjepitan tanh + garis ambang (linear dari dB ambang).
 class _LimPainter extends CustomPainter {
   final double lim;
@@ -772,7 +779,7 @@ class _LimPainter extends CustomPainter {
     final path = Path();
     for (var i = 0; i <= 120; i++) {
       final x = -1.25 + 2.5 * i / 120;
-      final y = math.tanh(a * x) / math.tanh(a);
+      final y = _tanh(a * x) / _tanh(a);
       final px = xOf(x), py = yOf(y);
       if (i == 0) {
         path.moveTo(px, py);

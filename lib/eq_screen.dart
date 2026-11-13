@@ -406,6 +406,7 @@ class _EditorRow extends StatelessWidget {
           const SizedBox(width: 8),
           _MiniToggle(
             label: const ['Puncak', 'Low Shelf', 'High Shelf'][b.t.clamp(0, 2)],
+            active: true, // selalu menyala: menampilkan tipe band saat ini
             onTap: () =>
                 ctl.setBandField(sel, 't', ((b.t + 1) % 3).toString()),
           ),
