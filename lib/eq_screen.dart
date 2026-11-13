@@ -184,7 +184,7 @@ class _Graph extends StatelessWidget {
             bands: s.bands,
             rta: ctl.rta,
             selected: ctl.selectedBand,
-            preamp: s.preamp,
+            bypass: s.bypass,
           ),
         ),
       );
@@ -196,12 +196,12 @@ class _GraphPainter extends CustomPainter {
   final List<BandState> bands;
   final List<double> rta;
   final int selected;
-  final double preamp;
+  final bool bypass;
   _GraphPainter({
     required this.bands,
     required this.rta,
     required this.selected,
-    required this.preamp,
+    required this.bypass,
   });
 
   @override
@@ -236,8 +236,8 @@ class _GraphPainter extends CustomPainter {
       final bw = size.width / 31;
       final barPaint = Paint()..color = S3Colors.cyan.withValues(alpha: 0.33);
       for (var i = 0; i < 31; i++) {
-        final frac = ((rta[i] + 60) / 54).clamp(0.0, 1.0).toDouble();
-        final h = frac * (size.height - 18);
+        final frac = ((rta[i] + 60) / 60).clamp(0.0, 1.0).toDouble();
+        final h = frac * size.height;
         canvas.drawRect(
           Rect.fromLTWH(i * bw + 0.5, size.height - h, bw - 1, h),
           barPaint,
@@ -245,47 +245,83 @@ class _GraphPainter extends CustomPainter {
       }
     }
 
-    // kurva gabungan
+    // Kurva gabungan — sama seperti panel web: TANPA preamp (preamp bukan
+    // bagian kurva; dulu kutambah dan garisnya melayang +5 dB di atas titik),
+    // dan rata 0 bila bypass. Isi tembus di bawah kurva seperti panel.
+    double totalAt(double f) {
+      if (bypass) return 0;
+      var db = 0.0;
+      for (final b in bands) {
+        if (b.on) db += _bandDb(b, f);
+      }
+      return db;
+    }
+
     final path = Path();
     const steps = 140;
     for (var i = 0; i <= steps; i++) {
       final x = size.width * i / steps;
       final f = _xToF(x, size.width);
-      var db = preamp;
-      for (final b in bands) {
-        if (b.on) db += _bandDb(b, f);
-      }
-      final y = dbToY(db.clamp(-_dbRange, _dbRange).toDouble());
+      final y = dbToY(totalAt(f).clamp(-_dbRange, _dbRange).toDouble());
       i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
     }
+    final fill = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+        fill, Paint()..color = S3Colors.cyan.withValues(alpha: 0.10));
     canvas.drawPath(
       path,
       Paint()
         ..color = S3Colors.cyan
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
+        ..strokeWidth = 2.2,
     );
+
+    // kurva band terpilih saja (warna band-nya, seperti panel web)
+    if (!bypass && selected >= 0 && selected < bands.length) {
+      final b = bands[selected];
+      if (b.on) {
+        final bp = Path();
+        for (var i = 0; i <= steps; i++) {
+          final x = size.width * i / steps;
+          final f = _xToF(x, size.width);
+          final y = dbToY(
+              _bandDb(b, f).clamp(-_dbRange, _dbRange).toDouble());
+          i == 0 ? bp.moveTo(x, y) : bp.lineTo(x, y);
+        }
+        canvas.drawPath(
+          bp,
+          Paint()
+            ..color = bandColors[selected % bandColors.length]
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+        );
+      }
+    }
 
     // titik band
     for (var i = 0; i < bands.length; i++) {
       final b = bands[i];
       final p = Offset(_fToX(b.f, size.width), dbToY(b.g));
       final col = bandColors[i % bandColors.length];
+      final r = i == selected ? 12.5 : 10.5;
       if (i == selected) {
-        canvas.drawCircle(p, 11, Paint()..color = col.withValues(alpha: 0.3));
+        canvas.drawCircle(p, 17, Paint()..color = col.withValues(alpha: 0.3));
       }
       canvas.drawCircle(
         p,
-        7,
+        r,
         Paint()..color = b.on ? col : S3Colors.dim,
       );
       canvas.drawCircle(
         p,
-        7,
+        r,
         Paint()
           ..color = i == selected ? Colors.white : S3Colors.line
           ..style = PaintingStyle.stroke
-          ..strokeWidth = i == selected ? 2 : 1,
+          ..strokeWidth = i == selected ? 2.5 : 1.2,
       );
       _label(canvas, '${i + 1}', p + const Offset(-3, -6), bold: true);
     }
