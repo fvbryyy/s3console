@@ -216,7 +216,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
                 valueText: '${fmtNum(dly, 1)} ms',
                 frac: (dly / 100).clamp(0, 1).toDouble(),
                 arcColor: const Color(0xFF6ED0E4),
-                diameter: 120,
+                diameter: 150,
                 onFrac: (f) => ctl.setInDelay(isA, f * 100, drag: true),
                 onEnd: () => ctl.setInDelay(isA, dly),
               ),
@@ -242,23 +242,48 @@ class _ChannelScreenState extends State<ChannelScreen> {
       );
     }
     if (sel == 4) {
-      // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut).
+      // Volume diatur dari fader strip MASTER (kenop VOLUME dobel dicabut);
+      // MUTE & DIM jadi blok besar mengisi panel.
+      Widget bigBlock(String label, bool active, Color activeColor,
+          VoidCallback onTap) {
+        return Expanded(
+          child: Material(
+            color: active ? activeColor : S3Colors.card,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: Center(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                        color: active ? Colors.white : S3Colors.dim)),
+              ),
+            ),
+          ),
+        );
+      }
+
       return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('MASTER',
               style: TextStyle(
                   color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _chipBtn(s.mute ? 'MUTE AKTIF' : 'MUTE', s.mute,
-                  () => ctl.setMute(!s.mute)),
-              const SizedBox(width: 10),
-              _chipBtn(s.dim ? 'DIM AKTIF' : 'DIM', s.dim,
-                  () => ctl.setDim(!s.dim)),
-            ],
+          const SizedBox(height: 14),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                bigBlock('MUTE', s.mute, S3Colors.muteRed,
+                    () => ctl.setMute(!s.mute)),
+                const SizedBox(width: 10),
+                bigBlock(
+                    'DIM', s.dim, S3Colors.blue, () => ctl.setDim(!s.dim)),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           const Text(
@@ -275,7 +300,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
       case 'Routing':
         return _RoutingPanel(ctl: ctl, ch: ch, src: c.src);
       case 'Crossover':
-        return _CrossoverPanel(ctl: ctl, ch: ch, c: c);
+        return _CrossoverPanel(ctl: ctl, ch: ch, c: c, d: d);
       case 'Delay':
         return _DelayPanel(ctl: ctl, ch: ch, ms: c.dly);
       case 'Limiter':
@@ -314,40 +339,42 @@ class _RoutingPanel extends StatelessWidget {
       ('A+B', 'Jumlah A + B'),
     ];
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('SUMBER KANAL',
             style: TextStyle(
                 color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            for (var i = 0; i < 3; i++)
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
-                  child: Material(
-                    color: src == i ? S3Colors.blue : S3Colors.card,
-                    borderRadius: BorderRadius.circular(8),
-                    child: InkWell(
-                      onTap: () => ctl.setChField(ch, 'src', '$i'),
+        // Blok sumber mengisi tinggi panel (dulu mungil di tengah — ruang
+        // kosong di atas/bawahnya yang dikeluhkan user).
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < 3; i++)
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
+                    child: Material(
+                      color: src == i ? S3Colors.blue : S3Colors.card,
                       borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 26),
+                      child: InkWell(
+                        onTap: () => ctl.setChField(ch, 'src', '$i'),
+                        borderRadius: BorderRadius.circular(8),
                         child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(opts[i].$1,
                                 style: TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 26,
                                     fontWeight: FontWeight.bold,
                                     color: src == i
                                         ? Colors.white
                                         : S3Colors.txt)),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(opts[i].$2,
                                 style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 12.5,
                                     color: src == i
                                         ? Colors.white70
                                         : S3Colors.dim)),
@@ -357,8 +384,8 @@ class _RoutingPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         const Text(
@@ -374,7 +401,9 @@ class _CrossoverPanel extends StatelessWidget {
   final DeviceController ctl;
   final int ch;
   final DlmsChState c;
-  const _CrossoverPanel({required this.ctl, required this.ch, required this.c});
+  final DlmsState d; // untuk overlay kurva OUT 1 vs OUT 2
+  const _CrossoverPanel(
+      {required this.ctl, required this.ch, required this.c, required this.d});
 
   @override
   Widget build(BuildContext context) {
@@ -410,11 +439,23 @@ class _CrossoverPanel extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        // legenda overlay dua output
+        Row(
+          children: [
+            _legend(const Color(0xFF52C76E), 'OUT 1'),
+            const SizedBox(width: 14),
+            _legend(const Color(0xFFB78CE0), 'OUT 2'),
+            const SizedBox(width: 14),
+            const Text('garis tebal = kanal yang sedang diedit',
+                style: TextStyle(color: S3Colors.dim, fontSize: 11)),
+          ],
+        ),
+        const SizedBox(height: 6),
         Expanded(
           child: CustomPaint(
             size: Size.infinite,
-            painter: _XoverPainter(c: c),
+            painter: _XoverPainter(c: c, d: d, selCh: ch),
           ),
         ),
         const SizedBox(height: 10),
@@ -458,6 +499,24 @@ class _CrossoverPanel extends StatelessWidget {
     );
   }
 
+  Widget _legend(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 4,
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 6),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 11.5, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   Widget _xoToggle(String label, bool on, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -492,7 +551,9 @@ double _xoMag(bool hp, double fc, int tf, double f) {
 
 class _XoverPainter extends CustomPainter {
   final DlmsChState c;
-  _XoverPainter({required this.c});
+  final DlmsState d;
+  final int selCh;
+  _XoverPainter({required this.c, required this.d, required this.selCh});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -509,16 +570,16 @@ class _XoverPainter extends CustomPainter {
       canvas.drawLine(Offset(8, y), Offset(size.width - 8, y),
           Paint()..color = const Color(0xFF232B36)..strokeWidth = 1);
     }
-    Path pathFor(bool hpToo) {
+    // Gabungan filter AKTIF satu kanal (respons nyata kanal itu).
+    Path combinedFor(DlmsChState cc) {
       final p = Path();
       const steps = 130;
-      for (var i = 0; i <= steps; i++) {
+      for ( var i = 0; i <= steps; i++) {
         final x = size.width * i / steps;
         final f = _xToF(x, size.width);
         var m = 1.0;
-        if (c.hpfOn) m *= _xoMag(true, c.hpfF, c.tf, f);
-        if (c.lpfOn) m *= _xoMag(false, c.lpfF, c.tf, f);
-        if (!hpToo) m = 1.0; // placeholder tak dipakai
+        if (cc.hpfOn) m *= _xoMag(true, cc.hpfF, cc.tf, f);
+        if (cc.lpfOn) m *= _xoMag(false, cc.lpfF, cc.tf, f);
         final y = yOf(m);
         i == 0 ? p.moveTo(x, y) : p.lineTo(x, y);
       }
@@ -577,14 +638,21 @@ class _XoverPainter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(x + 3, 6));
     }
-    // gabungan filter yang AKTIF saja (putih)
-    canvas.drawPath(
-      pathFor(true),
-      Paint()
-        ..color = const Color(0xFFF0F4F8)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4,
-    );
+    // Overlay respons OUT 1 vs OUT 2 — di sinilah titik potong antar
+    // output terlihat (maksud "grafik potong" user): hijau = OUT 1,
+    // ungu = OUT 2, yang sedang diedit digambar lebih tebal.
+    for (var i = 0; i < 2; i++) {
+      canvas.drawPath(
+        combinedFor(d.ch[i]),
+        Paint()
+          ..color = (i == 0
+                  ? const Color(0xFF52C76E)
+                  : const Color(0xFFB78CE0))
+              .withValues(alpha: i == selCh ? 1 : 0.8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = i == selCh ? 3.0 : 2.0,
+      );
+    }
     // label frekuensi
     for (final f in [20.0, 100.0, 1000.0, 10000.0, 20000.0]) {
       final x = _fToX(f, size.width);
@@ -626,7 +694,7 @@ class _DelayPanel extends StatelessWidget {
               valueText: '${fmtNum(ms, 2)} ms',
               frac: (ms / 20).clamp(0, 1).toDouble(),
               arcColor: const Color(0xFF6ED0E4),
-              diameter: 132,
+              diameter: 170,
               onFrac: (f) => ctl.setChField(
                   ch, 'dly', (f * 20).toStringAsFixed(2),
                   drag: true),
@@ -673,7 +741,7 @@ class _LimiterPanel extends StatelessWidget {
               valueText: fmtDb(lim),
               frac: ((lim + 24) / 24).clamp(0, 1).toDouble(),
               arcColor: S3Colors.red,
-              diameter: 132,
+              diameter: 170,
               onFrac: (f) => ctl.setChField(
                   ch, 'lim', (f * 24 - 24).toStringAsFixed(2),
                   drag: true),
@@ -705,15 +773,16 @@ class _FasePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('FASE & STATUS KANAL',
             style: TextStyle(
                 color: S3Colors.dim, fontSize: 12, fontWeight: FontWeight.bold)),
         const SizedBox(height: 14),
-        Row(
-          children: [
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Expanded(
               child: Material(
                 color: c.pol ? S3Colors.muteRed : S3Colors.card,
@@ -725,6 +794,7 @@ class _FasePanel extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(c.pol ? 'TERBALIK 180°' : 'NORMAL 0°',
                             style: TextStyle(
@@ -752,6 +822,7 @@ class _FasePanel extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(c.on ? 'KANAL AKTIF' : 'KANAL MATI',
                             style: TextStyle(
@@ -768,7 +839,8 @@ class _FasePanel extends StatelessWidget {
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ],
     );
