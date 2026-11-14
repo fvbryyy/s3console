@@ -2,9 +2,12 @@
 // Struktur mengikuti rancangan v22: header (logo, tab CHANNEL/EQ/RTA/PRESET/
 // PENGATURAN/INFO, status Terhubung, saklar DLMS|REGULER), baris preset +
 // SIMPAN, lalu isi tab. Berbicara ke API firmware yang sama dengan panel web.
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'channel_screen.dart';
+import 'device_ble.dart';
 import 'device_controller.dart';
 import 'eq_screen.dart';
 import 'regular_channel.dart';
@@ -64,6 +67,53 @@ class _ConnectScreenState extends State<ConnectScreen> {
   late final TextEditingController hostCtl =
       TextEditingController(text: widget.ctl.host);
   bool triedAuto = false;
+  bool _bleBusy = false;
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Alur tombol BLUETOOTH: pastikan adaptor menyala, pindai alat
+  /// "S3 Air", tampilkan daftar, sambungkan pilihan user. Pasangan
+  /// pertama memunculkan dialog pairing dari sistem — itu wajar; alat
+  /// hanya menerima ikatan baru selama jendela pairing-nya terbuka.
+  Future<void> _bluetoothFlow() async {
+    if (_bleBusy || widget.ctl.connecting) return;
+    setState(() => _bleBusy = true);
+    try {
+      var supported = false;
+      try {
+        supported = await FlutterBluePlus.isSupported;
+      } catch (_) {}
+      if (!supported) {
+        _snack('HP ini tidak mendukung Bluetooth LE.');
+        return;
+      }
+      if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+        _snack('Aktifkan Bluetooth dulu, lalu ketuk BLUETOOTH lagi.');
+        return;
+      }
+      if (!mounted) return;
+      final picked = await showDialog<BluetoothDevice>(
+        context: context,
+        builder: (c) => const _BleScanDialog(),
+      );
+      if (picked == null || !mounted) return;
+      final ok = await widget.ctl.connectBle(picked);
+      if (!ok) {
+        _snack('Sambungan Bluetooth gagal. Untuk pasangan pertama, alat '
+            'hanya menerima ikatan baru selama 60 detik sesudah menyala '
+            'atau sesudah tombol BOOT ditekan — coba lagi dalam jendela itu.');
+      }
+    } catch (_) {
+      _snack('Bluetooth gagal dibuka — periksa izin Bluetooth/lokasi '
+          'untuk aplikasi ini di Pengaturan HP.');
+    } finally {
+      if (mounted) setState(() => _bleBusy = false);
+    }
+  }
 
   @override
   void initState() {
@@ -73,7 +123,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
         triedAuto = true;
         await widget.ctl.loadSavedHost();
         if (mounted) hostCtl.text = widget.ctl.host;
-        await widget.ctl.connect(hostCtl.text);
+        final ok = await widget.ctl.connect(hostCtl.text);
+        if (!ok && mounted) {
+          // WiFi tak terjangkau: coba alat Bluetooth yang diingat.
+          await widget.ctl.tryConnectSavedBle();
+        }
       }
     });
   }
@@ -226,16 +280,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'Bluetooth menyusul sesudah tahap firmware BLE.'),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('BLUETOOTH',
-                                      style: TextStyle(color: Color(0xFF6ED0E4))),
+                                  onPressed: (_bleBusy || ctl.connecting)
+                                      ? null
+                                      : _bluetoothFlow,
+                                  child: Text(
+                                      _bleBusy ? 'MEMINDAI…' : 'BLUETOOTH',
+                                      style: const TextStyle(
+                                          color: Color(0xFF6ED0E4))),
                                 ),
                               ),
                             ],
@@ -473,5 +524,118 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+}
+
+// --- Dialog pemindaian Bluetooth ----------------------------------------------
+// Memindai ±10 detik untuk alat bernama "S3 Air" atau yang mengiklankan
+// UUID layanan S3 Air; user mengetuk satu untuk menyambung.
+
+class _BleScanDialog extends StatefulWidget {
+  const _BleScanDialog();
+  @override
+  State<_BleScanDialog> createState() => _BleScanDialogState();
+}
+
+class _BleScanDialogState extends State<_BleScanDialog> {
+  final Map<String, BluetoothDevice> _found = {};
+  StreamSubscription<List<ScanResult>>? _sub;
+  Timer? _timer;
+  bool _scanning = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = FlutterBluePlus.scanResults.listen((results) {
+      var changed = false;
+      for (final r in results) {
+        final name = r.advertisementData.advName.isNotEmpty
+            ? r.advertisementData.advName
+            : r.device.platformName;
+        final match = name == 'S3 Air' ||
+            r.advertisementData.serviceUuids
+                .contains(BleTransport.serviceUuid);
+        if (match && !_found.containsKey(r.device.remoteId.str)) {
+          _found[r.device.remoteId.str] = r.device;
+          changed = true;
+        }
+      }
+      if (changed && mounted) setState(() {});
+    });
+    _timer = Timer(const Duration(seconds: 10), () {
+      if (mounted) setState(() => _scanning = false);
+    });
+    unawaited(_runScan());
+  }
+
+  Future<void> _runScan() async {
+    try {
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+    } catch (_) {/* izin/adaptor: daftar tetap kosong, pesan tampil di dialog */}
+    if (mounted && _scanning) setState(() => _scanning = false);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _sub?.cancel();
+    unawaited(FlutterBluePlus.stopScan().catchError((_) {}));
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _found.values.toList();
+    return AlertDialog(
+      backgroundColor: S3Colors.panel,
+      title: const Text('Pilih alat Bluetooth',
+          style: TextStyle(fontSize: 16)),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_scanning)
+              const Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Memindai…',
+                      style: TextStyle(color: S3Colors.dim, fontSize: 13)),
+                ],
+              ),
+            if (items.isEmpty && !_scanning)
+              const Text(
+                'Tidak ada alat "S3 Air" yang terlihat. Pastikan alat menyala dan dekat dengan HP.',
+                style: TextStyle(color: S3Colors.dim, fontSize: 13),
+              ),
+            for (final d in items)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('S3 Air',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(d.remoteId.str,
+                    style:
+                        const TextStyle(color: S3Colors.dim, fontSize: 12)),
+                trailing:
+                    const Icon(Icons.bluetooth, color: Color(0xFF6ED0E4)),
+                onTap: () => Navigator.pop(context, d),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+      ],
+    );
   }
 }

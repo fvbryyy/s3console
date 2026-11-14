@@ -236,6 +236,15 @@ class PengaturanScreen extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
+          _row(
+            'Jalur koneksi',
+            'Jalur yang sedang dipakai aplikasi untuk berbicara dengan alat.',
+            Text(ctl.transportName,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: S3Colors.cyan)),
+          ),
           _WifiSection(ctl: ctl),
           const SizedBox(height: 8),
           _row(

@@ -1,17 +1,22 @@
-// Pengendali alat: memegang state, menjalankan polling meter/RTA (gabungan
-// 150 ms sejak firmware v5.2.4; fallback 200+150 ms di firmware lama) seperti
-// panel web (200/150 ms), dan meneruskan perubahan ke /api/set.
+// Pengendali alat: memegang state dan berbicara ke alat lewat
+// DeviceTransport — WiFi (HTTP: polling meter/RTA gabungan 150 ms sejak
+// firmware v5.2.4; fallback 200+150 ms di firmware lama) atau Bluetooth
+// (meter didorong alat tiap 50 ms). Keduanya memberi target tampilan yang
+// sama ke animasi pelicin 50 ms.
 // Nilai yang sedang diseret diterapkan setempat lebih dulu (terasa seketika),
 // pengiriman ke alat di-throttle ±30 ms selama seretan.
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'device_api.dart';
+import 'device_ble.dart';
+import 'device_transport.dart';
 import 'models.dart';
 
 class DeviceController extends ChangeNotifier {
-  DeviceApi? _api;
+  DeviceTransport? _api;
   DspState? state;
   MeterData meter = const MeterData();
   List<double> rta = const [];
@@ -19,9 +24,13 @@ class DeviceController extends ChangeNotifier {
   bool connecting = false;
   String? lastError;
   String host = 'mbahdac.local';
+
+  /// Jalur aktif: 'WiFi' atau 'Bluetooth' (ditampilkan di Pengaturan).
+  String transportName = 'WiFi';
   int selectedBand = 0;
 
   Timer? _meterTimer, _rtaTimer;
+  StreamSubscription<MeterData>? _meterSub;
   final Map<String, Timer> _throttle = {};
   final Map<String, Map<String, String>> _pending = {};
 
@@ -30,9 +39,12 @@ class DeviceController extends ChangeNotifier {
     connecting = true;
     lastError = null;
     notifyListeners();
+    final prev = _api;
+    if (prev != null) unawaited(prev.close().catchError((_) {}));
     _api = DeviceApi(host);
     try {
       state = await _api!.fetchState();
+      transportName = 'WiFi';
       connected = true;
       // Ingat alat ini: buka berikutnya langsung menyambung (rancangan layar 0).
       SharedPreferences.getInstance()
@@ -47,6 +59,81 @@ class DeviceController extends ChangeNotifier {
       connected = false;
       lastError = 'Tidak bisa menjangkau $host — pastikan satu WiFi dengan alat.';
       notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sambung lewat Bluetooth (mode lapangan): buka GATT ke [device], lalu
+  /// ambil keadaan penuh persis seperti jalur WiFi. Id perangkat diingat
+  /// ('bleId') agar lain kali bisa jatuh ke Bluetooth secara otomatis.
+  Future<bool> connectBle(BluetoothDevice device) async {
+    connecting = true;
+    lastError = null;
+    notifyListeners();
+    final prev = _api;
+    if (prev != null) unawaited(prev.close().catchError((_) {}));
+    try {
+      final t = await BleTransport.connectTo(device);
+      _api = t;
+      state = await t.fetchState();
+      transportName = 'Bluetooth';
+      connected = true;
+      SharedPreferences.getInstance()
+          .then((p) => p.setString('bleId', device.remoteId.str))
+          .catchError((_) => false);
+      connecting = false;
+      _startPolling();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      final t = _api;
+      _api = null;
+      if (t != null) unawaited(t.close().catchError((_) {}));
+      connecting = false;
+      connected = false;
+      lastError =
+          'Tidak bisa menyambung Bluetooth — pastikan alat menyala dan, untuk pasangan pertama, jendela pairing alat sedang terbuka (60 detik sesudah alat menyala atau sesudah tombol BOOT ditekan).';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Jatuh otomatis ke Bluetooth: pakai id alat yang diingat ('bleId')
+  /// saat sambungan WiFi gagal. Pendiam (mengembalikan false) bila tidak
+  /// ada id, Bluetooth mati, atau alat tidak terlihat dalam ±8 detik.
+  Future<bool> tryConnectSavedBle() async {
+    String? id;
+    try {
+      final p = await SharedPreferences.getInstance();
+      id = p.getString('bleId');
+    } catch (_) {}
+    if (id == null || id.isEmpty) return false;
+    try {
+      if (!await FlutterBluePlus.isSupported) return false;
+      if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+        return false;
+      }
+      BluetoothDevice? target;
+      final found = Completer<void>();
+      final sub = FlutterBluePlus.scanResults.listen((results) {
+        for (final r in results) {
+          if (r.device.remoteId.str == id) {
+            target = r.device;
+            if (!found.isCompleted) found.complete();
+          }
+        }
+      });
+      unawaited(FlutterBluePlus.startScan(
+        withRemoteIds: [id],
+        timeout: const Duration(seconds: 8),
+      ).catchError((_) {}));
+      await found.future.timeout(const Duration(seconds: 8),
+          onTimeout: () {});
+      await sub.cancel();
+      await FlutterBluePlus.stopScan();
+      if (target == null) return false;
+      return connectBle(target!);
+    } catch (_) {
       return false;
     }
   }
@@ -79,6 +166,9 @@ class DeviceController extends ChangeNotifier {
 
   void disconnect() {
     _stopPolling();
+    final t = _api;
+    _api = null;
+    if (t != null) unawaited(t.close().catchError((_) {}));
     connected = false;
     notifyListeners();
   }
@@ -87,6 +177,23 @@ class DeviceController extends ChangeNotifier {
 
   void _startPolling() {
     _stopPolling();
+    final push = _api?.meterPush;
+    if (push != null) {
+      // Transport dorongan (Bluetooth): paket meter + RTA tiba sendiri
+      // tiap 50 ms — jadikan target tampilan, sama seperti hasil polling,
+      // termasuk sinkron dirty ke state (untuk titik belum-tersimpan).
+      _meterSub = push.listen((m) {
+        _meterTgt = m;
+        if (state != null && state!.dirty != m.dirty) {
+          state!.dirty = m.dirty;
+        }
+        final rt = m.rta;
+        if (rt != null && rt.length >= 31) {
+          _rtaTgt = rt;
+          if (rta.length != 31) rta = List.of(rt);
+        }
+      });
+    } else {
     // Penjaga in-flight: jangan menumpuk permintaan baru selama yang lama
     // belum pulang — penumpukan di server ESP + antrean koneksi peramban
     // membuat meter terlihat "mati lalu hidup" (beku lama, lalu meloncat).
@@ -125,6 +232,7 @@ class DeviceController extends ChangeNotifier {
       } catch (_) {}
       _rtaBusy = false;
     });
+    }
     // Animasi tampilan 50 ms — peniru panel web asli: panel mengambil data
     // pada laju yang sama (meter 200 ms, RTA 150 ms) tapi MENGGAMBAR tiap
     // 50 ms dengan nilai yang dilicinkan (attack 0,55 / release 0,16),
@@ -180,9 +288,11 @@ class DeviceController extends ChangeNotifier {
   void _stopPolling() {
     _meterTimer?.cancel();
     _rtaTimer?.cancel();
+    _meterSub?.cancel();
     _animTimer?.cancel();
     _meterTimer = null;
     _rtaTimer = null;
+    _meterSub = null;
     _animTimer = null;
   }
 
@@ -581,6 +691,9 @@ class DeviceController extends ChangeNotifier {
     for (final t in _throttle.values) {
       t.cancel();
     }
+    final t = _api;
+    _api = null;
+    if (t != null) unawaited(t.close().catchError((_) {}));
     super.dispose();
   }
 }
