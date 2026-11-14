@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Kunci rilis S3 KONSOL — file rahasia, jangan pernah commit
+/android/key.properties
+*.jks
