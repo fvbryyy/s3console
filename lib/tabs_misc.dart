@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'device_controller.dart';
 import 'theme.dart';
@@ -244,6 +245,35 @@ class PengaturanScreen extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: S3Colors.cyan)),
+          ),
+          _row(
+            'Ukuran tampilan',
+            'Kecilkan bila tampilan terasa kebesaran di HP ini. Berlaku seketika dan diingat.',
+            SizedBox(
+              width: 178,
+              child: ValueListenableBuilder<double>(
+                valueListenable: uiScale,
+                builder: (context, s, _) => Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: s,
+                        min: 0.75,
+                        max: 1.0,
+                        divisions: 25,
+                        onChanged: (v) => uiScale.value = v,
+                        onChangeEnd: (v) => SharedPreferences.getInstance()
+                            .then((p) => p.setDouble('uiscale', v))
+                            .catchError((_) => false),
+                      ),
+                    ),
+                    Text('${(s * 100).round()}%',
+                        style: const TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           _row(

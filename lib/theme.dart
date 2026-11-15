@@ -128,3 +128,10 @@ Shader rtaGradient(Rect full, {double alpha = 1}) {
 Color rtaColorAt(double frac) => frac >= 0.82
     ? const Color(0xFFF47068)
     : (frac >= 0.6 ? const Color(0xFFF8CD37) : const Color(0xFF34C76E));
+
+/// Skala tampilan global aplikasi (diatur user di Pengaturan ->
+/// "Ukuran tampilan"). Kanvas rancangan 880x400 di akar aplikasi
+/// diperbesar sebesar 1/skala ini, jadi seluruh UI mengecil
+/// sebanding. Default 0,87 - keluhan user 2026-11-15: tampilan
+/// masih kebesaran semua dan sentuhan susah.
+final ValueNotifier<double> uiScale = ValueNotifier<double>(0.87);

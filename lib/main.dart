@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'channel_screen.dart';
 import 'device_controller.dart';
 import 'eq_screen.dart';
@@ -32,6 +33,15 @@ class _S3AppState extends State<S3App> {
   final ctl = DeviceController();
 
   @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      final v = p.getDouble('uiscale');
+      if (v != null && v >= 0.7 && v <= 1.0) uiScale.value = v;
+    }).catchError((_) => null);
+  }
+
+  @override
   void dispose() {
     ctl.dispose();
     super.dispose();
@@ -44,13 +54,18 @@ class _S3AppState extends State<S3App> {
       debugShowCheckedModeBanner: false,
       theme: buildS3Theme(),
       builder: (context, child) {
-        final mq = MediaQuery.of(context);
-        return MediaQuery(
-          data: mq.copyWith(textScaler: TextScaler.noScaling),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: SizedBox(width: 880, height: 400, child: child),
-          ),
+        return ValueListenableBuilder<double>(
+          valueListenable: uiScale,
+          builder: (context, s, _) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(textScaler: TextScaler.noScaling),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(width: 880 / s, height: 400 / s, child: child),
+              ),
+            );
+          },
         );
       },
       home: AnimatedBuilder(
