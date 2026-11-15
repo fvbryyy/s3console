@@ -1,7 +1,7 @@
-// Antarmuka transport ke alat S3 Air. Dua perwujudan:
-// - DeviceApi (device_api.dart): HTTP/WiFi ke API firmware — meter di-polling.
-// - BleTransport (device_ble.dart): Bluetooth LE — meter didorong alat
-//   lewat notifikasi, jadi [meterPush] tidak null di sana.
+// Antarmuka transport ke alat S3 Air. Satu-satunya perwujudan sejak
+// v1.2.0 adalah DeviceApi (device_api.dart): HTTP ke API firmware —
+// meter di-polling, jadi [meterPush] selalu null. (Dulu ada
+// BleTransport/Bluetooth; dicabut bersama mode AP menggantikannya.)
 // Pengendali (DeviceController) hanya berbicara lewat antarmuka ini.
 import 'models.dart';
 

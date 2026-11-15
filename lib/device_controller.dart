@@ -1,17 +1,15 @@
 // Pengendali alat: memegang state dan berbicara ke alat lewat
-// DeviceTransport — WiFi (HTTP: polling meter/RTA gabungan 150 ms sejak
-// firmware v5.2.4; fallback 200+150 ms di firmware lama) atau Bluetooth
-// (meter didorong alat tiap 50 ms). Keduanya memberi target tampilan yang
-// sama ke animasi pelicin 50 ms.
+// DeviceTransport — HTTP (polling meter/RTA gabungan 150 ms sejak
+// firmware v5.2.4; fallback 200+150 ms di firmware lama), baik lewat
+// WiFi rumah maupun mode AP alat (alamat tetap 192.168.4.1, sejak
+// firmware v1.2.0 menggantikan Bluetooth).
 // Nilai yang sedang diseret diterapkan setempat lebih dulu (terasa seketika),
 // pengiriman ke alat di-throttle ±30 ms selama seretan.
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'device_api.dart';
-import 'device_ble.dart';
 import 'device_transport.dart';
 import 'models.dart';
 
@@ -25,7 +23,7 @@ class DeviceController extends ChangeNotifier {
   String? lastError;
   String host = 'mbahdac.local';
 
-  /// Jalur aktif: 'WiFi' atau 'Bluetooth' (ditampilkan di Pengaturan).
+  /// Jalur aktif: 'WiFi' atau 'AP' (ditampilkan di Pengaturan).
   String transportName = 'WiFi';
   int selectedBand = 0;
 
@@ -44,12 +42,14 @@ class DeviceController extends ChangeNotifier {
     _api = DeviceApi(host);
     try {
       state = await _api!.fetchState();
-      transportName = 'WiFi';
+      transportName = host == apHost ? 'AP' : 'WiFi';
       connected = true;
       // Ingat alat ini: buka berikutnya langsung menyambung (rancangan layar 0).
-      SharedPreferences.getInstance()
-          .then((p) => p.setString('s3host', host))
-          .catchError((_) => false);
+      if (host != apHost) {
+        SharedPreferences.getInstance()
+            .then((p) => p.setString('s3host', host))
+            .catchError((_) => false);
+      }
       connecting = false;
       _startPolling();
       notifyListeners();
@@ -63,76 +63,18 @@ class DeviceController extends ChangeNotifier {
     }
   }
 
-  /// Sambung lewat Bluetooth (mode lapangan): buka GATT ke [device], lalu
-  /// ambil keadaan penuh persis seperti jalur WiFi. Id perangkat diingat
-  /// ('bleId') agar lain kali bisa jatuh ke Bluetooth secara otomatis.
-  Future<bool> connectBle(BluetoothDevice device) async {
-    connecting = true;
-    lastError = null;
-    notifyListeners();
-    final prev = _api;
-    if (prev != null) unawaited(prev.close().catchError((_) {}));
-    try {
-      final t = await BleTransport.connectTo(device);
-      _api = t;
-      state = await t.fetchState();
-      transportName = 'Bluetooth';
-      connected = true;
-      SharedPreferences.getInstance()
-          .then((p) => p.setString('bleId', device.remoteId.str))
-          .catchError((_) => false);
-      connecting = false;
-      _startPolling();
-      notifyListeners();
-      return true;
-    } catch (e) {
-      final t = _api;
-      _api = null;
-      if (t != null) unawaited(t.close().catchError((_) {}));
-      connecting = false;
-      connected = false;
-      lastError =
-          'Tidak bisa menyambung Bluetooth — pastikan alat menyala dan, untuk pasangan pertama, jendela pairing alat sedang terbuka (60 detik sesudah alat menyala atau sesudah tombol BOOT ditekan).';
-      notifyListeners();
-      return false;
-    }
-  }
+  /// Alamat tetap alat saat menyiarkan mode AP (jalur lapangan sejak
+  /// firmware v1.2.0 — pengganti Bluetooth yang dicabut).
+  static const String apHost = '192.168.4.1';
 
-  /// Jatuh otomatis ke Bluetooth: pakai id alat yang diingat ('bleId')
-  /// saat sambungan WiFi gagal. Pendiam (mengembalikan false) bila tidak
-  /// ada id, Bluetooth mati, atau alat tidak terlihat dalam ±8 detik.
-  Future<bool> tryConnectSavedBle() async {
-    String? id;
+  /// Sambung ke mode AP alat: HTTP yang sama persis ke 192.168.4.1.
+  Future<bool> connectAp() => connect(apHost);
+
+  /// Jatuh otomatis ke mode AP saat WiFi rumah tak terjangkau:
+  /// berhasil bila HP sedang gabung ke WiFi "S3 Air" milik alat.
+  Future<bool> tryConnectAp() async {
     try {
-      final p = await SharedPreferences.getInstance();
-      id = p.getString('bleId');
-    } catch (_) {}
-    if (id == null || id.isEmpty) return false;
-    try {
-      if (!await FlutterBluePlus.isSupported) return false;
-      if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
-        return false;
-      }
-      BluetoothDevice? target;
-      final found = Completer<void>();
-      final sub = FlutterBluePlus.scanResults.listen((results) {
-        for (final r in results) {
-          if (r.device.remoteId.str == id) {
-            target = r.device;
-            if (!found.isCompleted) found.complete();
-          }
-        }
-      });
-      unawaited(FlutterBluePlus.startScan(
-        withRemoteIds: [id],
-        timeout: const Duration(seconds: 8),
-      ).catchError((_) {}));
-      await found.future.timeout(const Duration(seconds: 8),
-          onTimeout: () {});
-      await sub.cancel();
-      await FlutterBluePlus.stopScan();
-      if (target == null) return false;
-      return await connectBle(target!);
+      return await connect(apHost);
     } catch (_) {
       return false;
     }
@@ -179,9 +121,9 @@ class DeviceController extends ChangeNotifier {
     _stopPolling();
     final push = _api?.meterPush;
     if (push != null) {
-      // Transport dorongan (Bluetooth): paket meter + RTA tiba sendiri
-      // tiap 50 ms — jadikan target tampilan, sama seperti hasil polling,
-      // termasuk sinkron dirty ke state (untuk titik belum-tersimpan).
+      // Transport dorongan (dulu Bluetooth; sejak v1.2.0 tidak ada
+      // transport yang memakainya — DeviceApi selalu null di sini):
+      // paket meter + RTA tiba sendiri tiap 50 ms.
       _meterSub = push.listen((m) {
         _meterTgt = m;
         if (state != null && state!.dirty != m.dirty) {
