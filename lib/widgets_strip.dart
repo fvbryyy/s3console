@@ -90,17 +90,19 @@ class DesignStrip extends StatelessWidget {
                         : S3Colors.plate),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(name,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.6,
-                      color: (!master && !name.startsWith('IN'))
-                          ? S3Colors.accDark
-                          : Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(name,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.6,
+                        color: (!master && !name.startsWith('IN'))
+                            ? S3Colors.accDark
+                            : Colors.white),
+                    maxLines: 1),
+              ),
             ),
             const SizedBox(height: 4),
             Text(gainText,

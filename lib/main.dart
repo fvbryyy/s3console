@@ -505,14 +505,28 @@ class _ConsoleScreenState extends State<ConsoleScreen> {
     );
   }
 
+  // Layar padat (CHANNEL & EQ) dirancang pada kanvas 880x330. Di HP yang
+  // kerapatan tampilannya lebih besar, piksel logisnya menyusut sehingga
+  // isi layar meluber dan bagian bawah tak terjangkau ("kebesaran").
+  // _fit mengecilkan sebanding sampai muat — semua tetap terlihat dan
+  // gestur fader utuh (beda dengan scroll yang merebut seretan vertikal).
+  Widget _fit(Widget child) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.topCenter,
+      child: SizedBox(width: 880, height: 330, child: child),
+    );
+  }
+
   Widget _body(DeviceController ctl, dynamic s) {
     switch (tabs[tab]) {
       case 'CHANNEL':
-        return s.dlms.on
+        return _fit(s.dlms.on
             ? ChannelScreen(ctl: ctl)
-            : RegularChannelScreen(ctl: ctl);
+            : RegularChannelScreen(ctl: ctl));
       case 'EQ':
-        return EqScreen(ctl: ctl, onOpenDlms: () => setState(() => tab = 0));
+        return _fit(
+            EqScreen(ctl: ctl, onOpenDlms: () => setState(() => tab = 0)));
       case 'RTA':
         return RtaScreen(ctl: ctl);
       case 'PRESET':
@@ -542,6 +556,7 @@ class _BleScanDialogState extends State<_BleScanDialog> {
   StreamSubscription<List<ScanResult>>? _sub;
   Timer? _timer;
   bool _scanning = true;
+  String? _error; // galat pemindaian terakhir — ditampilkan, tidak ditelan
 
   @override
   void initState() {
@@ -562,16 +577,29 @@ class _BleScanDialogState extends State<_BleScanDialog> {
       }
       if (changed && mounted) setState(() {});
     });
-    _timer = Timer(const Duration(seconds: 10), () {
-      if (mounted) setState(() => _scanning = false);
-    });
     unawaited(_runScan());
   }
 
   Future<void> _runScan() async {
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 10), () {
+      if (mounted) setState(() => _scanning = false);
+    });
+    if (mounted) {
+      setState(() {
+        _scanning = true;
+        _error = null;
+        _found.clear();
+      });
+    }
     try {
+      await FlutterBluePlus.stopScan().catchError((_) {});
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-    } catch (_) {/* izin/adaptor: daftar tetap kosong, pesan tampil di dialog */}
+    } catch (e) {
+      // Mis. pemindaian dibatasi Android (terlalu sering) atau izin kurang —
+      // tampilkan apa adanya agar penyebabnya terlihat, bukan daftar kosong.
+      if (mounted) setState(() => _error = '$e');
+    }
     if (mounted && _scanning) setState(() => _scanning = false);
   }
 
@@ -609,10 +637,23 @@ class _BleScanDialogState extends State<_BleScanDialog> {
                       style: TextStyle(color: S3Colors.dim, fontSize: 13)),
                 ],
               ),
-            if (items.isEmpty && !_scanning)
+            if (items.isEmpty && !_scanning && _error == null)
               const Text(
                 'Tidak ada alat "S3 Air" yang terlihat. Pastikan alat menyala dan dekat dengan HP.',
                 style: TextStyle(color: S3Colors.dim, fontSize: 13),
+              ),
+            if (items.isEmpty && !_scanning && _error != null)
+              Text(
+                'Pemindaian gagal: $_error',
+                style: const TextStyle(color: S3Colors.red, fontSize: 13),
+              ),
+            if (!_scanning)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => unawaited(_runScan()),
+                  child: const Text('Pindai ulang'),
+                ),
               ),
             for (final d in items)
               ListTile(
