@@ -132,7 +132,7 @@ class DeviceController extends ChangeNotifier {
       await sub.cancel();
       await FlutterBluePlus.stopScan();
       if (target == null) return false;
-      return connectBle(target!);
+      return await connectBle(target!);
     } catch (_) {
       return false;
     }
