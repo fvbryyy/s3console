@@ -109,10 +109,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
         triedAuto = true;
         await widget.ctl.loadSavedHost();
         if (mounted) hostCtl.text = widget.ctl.host;
-        final ok = await widget.ctl.connect(hostCtl.text);
+        final ok = await widget.ctl.tryConnectAp();
         if (!ok && mounted) {
-          // WiFi rumah tak terjangkau: coba mode AP alat.
-          await widget.ctl.tryConnectAp();
+          // Mode AP tak terjangkau: coba host yang diingat (cadangan
+          // bila alat suatu saat memakai firmware mode STA).
+          await widget.ctl.connect(hostCtl.text);
         }
       }
     });
@@ -279,7 +280,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                           ),
                           const SizedBox(height: 12),
                           const Text(
-                            'WiFi untuk di rumah — mode AP untuk di lapangan.\nSaat memakai WiFi rumah, pastikan HP satu jaringan dengan alat; untuk mode AP, gabung ke WiFi "S3 Air" (sandi s3air123).',
+                            'Alat menyiarkan WiFi sendiri "S3 Air" (sandi s3air123).\nGabung HP ke WiFi itu, lalu ketuk MODE AP.',
                             style: TextStyle(color: S3Colors.dim, fontSize: 11),
                             textAlign: TextAlign.center,
                           ),
